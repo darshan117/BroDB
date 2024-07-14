@@ -8,7 +8,7 @@ const (
 	LEAF
 )
 
-type Page struct {
+type PageHeader struct {
 	pageId    uint32
 	pageType  PageType
 	freeStart uint16 // start of freespace
@@ -25,4 +25,10 @@ type Cell struct {
 type PointerList struct {
 	start *Cell
 	size  uint16
+}
+
+type BufPage struct {
+	Data    []byte
+	pageNum uint
+	// more can be added here
 }

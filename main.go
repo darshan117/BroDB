@@ -3,11 +3,38 @@ package main
 import (
 	Init "blackdb/init"
 	"blackdb/pager"
+	"fmt"
+	"os"
+	"syscall"
 )
 
-func main() {
+var file *os.File
 
-	file := Init.Init()
-	pager.MakePage(22, 1, file)
+func init() {
+	// HACK: find a way to call the init and make page zero here
+	file = Init.Init()
+	pagH, _ := pager.MakePageZero(22, 1, file)
+	err := pager.LoadPage(0, file)
+	if err != nil {
+		fmt.Println("error while loading the page")
+	}
+	pagH.AddCell([]byte("this is the first cell"))
+
+}
+
+func main() {
+	pheader, err := pager.MakePage(1, 1, file)
+	if err != nil {
+		fmt.Println("error making page ", err)
+	}
+	pheader.AddCell([]byte("newcell"))
 	defer file.Close()
+
+	defer func() {
+		if pager.BufData.Data != nil {
+			if err := syscall.Munmap(pager.BufData.Data); err != nil {
+				fmt.Printf("Error unmapping: %v\n", err)
+			}
+		}
+	}()
 }
