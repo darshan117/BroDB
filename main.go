@@ -27,7 +27,13 @@ func main() {
 	if err != nil {
 		fmt.Println("error making page ", err)
 	}
-	pheader.AddCell([]byte("newcell"))
+	pheader.AddCell([]byte("hell"))
+	pheader.AddCell([]byte("something New;"))
+	pheader.GetCell(1)
+	pheader.GetCell(0)
+
+	pheader.RemoveCell(1)
+	pheader.SlotArray()
 	defer file.Close()
 
 	defer func() {

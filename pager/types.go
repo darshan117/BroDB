@@ -14,17 +14,27 @@ type PageHeader struct {
 	freeStart uint16 // start of freespace
 	freeEnd   uint16
 	totalFree uint16
+	numSlots  uint16
 	flags     uint8
+	// TODO: add the rightmost child pointer
+	// also last offset used
+	// number of slots used
 }
 
+type CellHeader struct {
+	cellLoc    uint16
+	cellSize   uint16
+	isOverflow bool
+	// TODO: implement the leftmost child pointer for the given key
+}
 type Cell struct {
-	cellLoc  uint16
-	cellSize uint16
+	header      CellHeader
+	cellContent []byte
 }
 
 type PointerList struct {
-	start *Cell
-	size  uint16
+	offset uint16
+	size   uint16
 }
 
 type BufPage struct {
