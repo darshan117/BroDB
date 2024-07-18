@@ -67,6 +67,8 @@ func makeFileHeader(file *os.File) error {
 	// can do add other header things if needed
 	err := binary.Write(file, binary.BigEndian, Header) // magic code Brodb
 	if err != nil {
+
+		// FIXME: make the new error unable to make error
 		fmt.Errorf("%w... Error while adding the db file Header", err)
 	}
 	return nil
@@ -74,18 +76,13 @@ func makeFileHeader(file *os.File) error {
 }
 
 // make the serialize function for page of 4096 bytes and way to fit all the cell
-func makePage() {}
 
 // make the datapage with the gob encoding in order to store the data
-func dataPage() {}
 
 // inserting to the datapage
-func insertToDataPage() {}
 
 // delete the entry from the datapage
-func removeFromDataPage() {}
 
 // update the dataPage
-func updateDataPage() {}
 
 // TODO:  create make the btree full functionality in order to insert delete and update and read CRUD

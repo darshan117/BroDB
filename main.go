@@ -28,7 +28,12 @@ func main() {
 		fmt.Println("error making page ", err)
 	}
 	pheader.AddCell([]byte("hell"))
+
 	pheader.AddCell([]byte("something New;"))
+	for i := 0; i < 208; i++ {
+		pheader.AddCell([]byte(fmt.Sprintf("cell no : %d", i)))
+
+	}
 	pheader.GetCell(1)
 	pheader.GetCell(0)
 

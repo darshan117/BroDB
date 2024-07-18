@@ -19,6 +19,7 @@ type PageHeader struct {
 	// TODO: add the rightmost child pointer
 	// also last offset used
 	// number of slots used
+	// should contain the right most child
 }
 
 type CellHeader struct {
@@ -26,6 +27,7 @@ type CellHeader struct {
 	cellSize   uint16
 	isOverflow bool
 	// TODO: implement the leftmost child pointer for the given key
+	// leftChild pageNum
 }
 type Cell struct {
 	header      CellHeader
