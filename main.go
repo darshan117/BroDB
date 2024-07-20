@@ -4,6 +4,7 @@ import (
 	Init "blackdb/init"
 	"blackdb/pager"
 	"fmt"
+	"log"
 	"os"
 	"syscall"
 )
@@ -30,15 +31,22 @@ func main() {
 	pheader.AddCell([]byte("hell"))
 
 	pheader.AddCell([]byte("something New;"))
-	for i := 0; i < 208; i++ {
+	for i := 0; i < 4; i++ {
 		pheader.AddCell([]byte(fmt.Sprintf("cell no : %d", i)))
 
 	}
-	pheader.GetCell(1)
-	pheader.GetCell(0)
+	// pheader.GetCell(3)
+	// fmt.Printf("%+v \n", pheader.GetCell(0))
 
-	pheader.RemoveCell(1)
-	pheader.SlotArray()
+	err = pheader.RemoveCell(0)
+	fmt.Println("removed hell")
+	fmt.Println(pheader.Defragment())
+	fmt.Println(string(pager.BufData.Data[4000:]))
+	// fmt.Println(pheader.SlotArray())
+	if err != nil {
+		log.Fatalf("error is %s	", err)
+	}
+
 	defer file.Close()
 
 	defer func() {

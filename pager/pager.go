@@ -91,7 +91,6 @@ func (page *PageHeader) AddCell(cellContent []byte) error {
 		return fmt.Errorf("error while adding cell |Cell Size %d larger than the free space %d", cellSize, page.totalFree)
 	}
 	cellSer, n := cellheader.serializeCell(cell.cellContent)
-	// fmt.Println("cell is serialized", cellSer.Bytes(), cellSer.Len())
 	copy(BufData.Data[page.freeEnd-uint16(n):page.freeEnd], cellSer.Bytes())
 
 	page.freeEnd -= uint16(n)
@@ -115,15 +114,17 @@ func (cell *CellHeader) serializeCell(cellContent []byte) (*bytes.Buffer, uint) 
 
 }
 
-func (cell *Cell) deserializeCell(cellheader []byte) {
+func (cell *Cell) deserializeCell(cellheader []byte) uint {
 	// fmt.Printf("Cell header %X \n ", cellheader[4])
 	cell.header.cellLoc = binary.BigEndian.Uint16(cellheader[:2])
 	cell.header.cellSize = binary.BigEndian.Uint16(cellheader[2:4])
+	// fmt.Println("size", cell.header.cellSize, cellheader[2:4])
 	if int(cellheader[4]) == 1 {
 		cell.header.isOverflow = true
 	} else {
 		cell.header.isOverflow = false
 	}
+	return uint(len(cellheader))
 
 }
 
@@ -151,22 +152,30 @@ func LoadPage(pageNo uint, dbfile *os.File) error {
 	return nil
 }
 
-func (page *PageHeader) RemoveCell(idx uint) {
-	slotIndex := PAGEHEAD_SIZE + idx*2 // hardcoded pagesize
-	// TODO: shift the slot array to the left
+func (page *PageHeader) RemoveCell(idx uint) error {
+	// slotIndex := PAGEHEAD_SIZE + idx*2 // hardcoded pagesize
+	if idx > uint(page.numSlots)-1 {
+		return fmt.Errorf("error while removing cell | index is greater than the max slots... ")
+
+	}
 	oldCell := page.GetCell(idx)
-	// TODO: increase the free space
 	page.totalFree += oldCell.header.cellSize
-	// TODO: also increase the free space for the decrement the freeStart by the slot size
-	// fmt.Println("Before,  ", BufData.Data[:slotIndex+2])
-	binary.BigEndian.PutUint16(BufData.Data[slotIndex:slotIndex+2], uint16(0))
+	page.ShiftSlots(idx)
+	binary.BigEndian.PutUint16(BufData.Data[page.freeStart-2:page.freeStart], uint16(0))
 	page.freeStart -= 2
-	// TODO: check for the idx if it exists
-	// TODO: check if the cell is empty
-	// fmt.Println("After,  ", BufData.Data[:slotIndex+2])
 	page.numSlots -= 1
-	// FIXME: add here
 	page.totalFree += 2 // slot size has
+	return nil
+}
+
+func (page *PageHeader) ShiftSlots(idx uint) {
+	slotIndex := PAGEHEAD_SIZE + idx*2
+	for i := 0; i < int(page.numSlots)-int(idx); i++ {
+		// shift the slots to the left
+		copy(BufData.Data[slotIndex:slotIndex+2], BufData.Data[slotIndex+2:slotIndex+4])
+		slotIndex += 2
+
+	}
 }
 
 // TODO: add the slot array list to some struct
@@ -189,7 +198,7 @@ func (page *PageHeader) RemoveCell(idx uint) {
 
 // new implementaton
 
-func (page *PageHeader) SlotArray() {
+func (page *PageHeader) SlotArray() []PointerList {
 	var slotarray []PointerList
 	startidx := PAGEHEAD_SIZE // page header size make it global
 
@@ -197,11 +206,14 @@ func (page *PageHeader) SlotArray() {
 		var slot PointerList
 		offset := BufData.Data[i : i+2]
 		slot.offset = binary.BigEndian.Uint16(offset)
-		slot.size = page.GetCell(uint((i - 12) / 2)).header.cellSize // BUG:get 12 check here or is it Pagehead_size
+		fmt.Println("offset", slot.offset)
+		cell := page.GetCell(uint((i - PAGEHEAD_SIZE) / 2))
+
+		slot.size = cell.header.cellSize
 		slotarray = append(slotarray, slot)
 		i += 2
 	}
-	fmt.Println(slotarray)
+	return slotarray
 
 }
 
@@ -209,17 +221,60 @@ func (page *PageHeader) GetCell(idx uint) Cell {
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	offset := BufData.Data[slotIndex : slotIndex+2]
 	offsetVal := binary.BigEndian.Uint16(offset)
+	fmt.Println(offsetVal)
 	var cell Cell
 	cellHeaderSize := 5
 	cell.deserializeCell(BufData.Data[offsetVal : offsetVal+uint16(cellHeaderSize)+1])
+	fmt.Printf("%+v  \n", cell)
+	fmt.Println("from ", offsetVal+uint16(cellHeaderSize), "to ", cell.header.cellSize)
+
 	cell.cellContent = BufData.Data[offsetVal+uint16(cellHeaderSize) : offsetVal+uint16(cellHeaderSize)+cell.header.cellSize]
-	// fmt.Printf("Cell is %+v \n", cell)
-	// fmt.Println(string(cell.cellContent))
+	return cell
+
+}
+
+// TODO: Get cell by offset
+func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
+	var cell Cell
+	cellHeaderSize := 5
+	cell.deserializeCell(BufData.Data[offset : offset+uint16(cellHeaderSize)+1])
+	cell.cellContent = BufData.Data[offset+uint16(cellHeaderSize) : offset+uint16(cellHeaderSize)+cell.header.cellSize]
 	return cell
 
 }
 
 // TODO: defragment the page move all the cells to the right and remove all the gaps between the page
+func (page *PageHeader) Defragment() error {
+
+	slotarray := page.SlotArray()
+	binheap := heap[uint16]{}
+	destPointer := uint16(4096)
+	for _, v := range slotarray {
+		binheap.add(v.offset)
+	}
+	// temp := destPointer
+	fmt.Println("buf data before ", string(BufData.Data[4096-uint16(500):]))
+	for i := 0; i < int(page.numSlots); i++ {
+		offset, err := binheap.remove()
+		if err != nil {
+			return fmt.Errorf(" %w Error while removing the element from binheap", err)
+		}
+		newCell := page.GetCellByOffset(offset)
+		cellSer, n := newCell.header.serializeCell(newCell.cellContent)
+		copy(BufData.Data[destPointer-uint16(n):destPointer], cellSer.Bytes())
+		destPointer -= uint16(n)
+		// BUG: fix the fucking pointer after changing the stuff
+
+	}
+	fmt.Println("buf data after ", string(BufData.Data[4096-uint16(500):]))
+	page.freeEnd = destPointer
+	page.totalFree = page.freeEnd - page.freeStart
+	// fmt.Println(string(newCell.cellContent))
+
+	// fmt.Println(binheap.items)
+	return nil
+}
+
 // how to do it create a destination offset and implement a binary heap in order to do it
 // implement the binary heap from scratch tommorrow
 // for making contiguous space
@@ -230,3 +285,5 @@ func (page *PageHeader) GetCell(idx uint) Cell {
 
 // TODO: tommorrow also make the test cases for cell
 // TODO: drain function is important for the binary tree function
+// TODO: shift slots by index
+// TODO: add cell by offset
