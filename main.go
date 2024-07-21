@@ -42,7 +42,7 @@ func main() {
 	fmt.Println("removed hell")
 	fmt.Println(pheader.Defragment())
 	fmt.Println(string(pager.BufData.Data[4000:]))
-	// fmt.Println(pheader.SlotArray())
+	fmt.Println(pheader.SlotArray())
 	if err != nil {
 		log.Fatalf("error is %s	", err)
 	}

@@ -35,8 +35,8 @@ type Cell struct {
 }
 
 type PointerList struct {
-	offset uint16
-	size   uint16
+	index uint16
+	size  uint16
 }
 
 type BufPage struct {
