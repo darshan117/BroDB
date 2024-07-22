@@ -21,6 +21,14 @@ type PageHeader struct {
 	// number of slots used
 	// should contain the right most child
 }
+type OverflowPageHeader struct {
+	next uint16
+	size uint16
+}
+type OverflowPtr struct {
+	payload []byte
+	ptr     uint32
+}
 
 type CellHeader struct {
 	cellLoc    uint16

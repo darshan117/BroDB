@@ -4,26 +4,36 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"sync"
+)
+
+var (
+	Dbfile *os.File
+	once   sync.Once
 )
 
 func Init() *os.File {
-	dbname := os.Args[1]
+	once.Do(func() {
+		dbname := os.Args[1]
 
-	fmt.Println(dbname, os.Getpagesize())
-	// wd, _ := os.Getwd()
-	dbfile, _ := os.Create(dbname)
-	// defer dbfile.Close()
-	fmt.Println(dbfile.Fd())
-	if err := makeFileHeader(dbfile); err != nil {
-		return nil
-	}
-	fmt.Println("Check the header")
-	return dbfile
+		fmt.Println(dbname, os.Getpagesize())
+		// wd, _ := os.Getwd()
+		Dbfile, _ = os.Create(dbname)
+		// defer dbfile.Close()
+		fmt.Println(Dbfile.Fd())
+		if err := makeFileHeader(Dbfile); err != nil {
+			return
+		}
+		fmt.Println("Check the header")
+
+	})
+	return Dbfile
 }
 
 var (
 	MAGICCODE       = "BroDB\000"
 	PAGE_SIZE       = os.Getpagesize()
+	TOTAL_PAGES     = 1
 	FILE_CH_COUNTER = 0
 	DATABASE_SIZE   = 1 // in pages
 )
@@ -63,13 +73,14 @@ func makeFileHeader(file *os.File) error {
 	binary.BigEndian.PutUint32(Header[18:], uint32(FILE_CH_COUNTER))   // file change counter
 	binary.BigEndian.PutUint32(Header[18+4:], uint32(DATABASE_SIZE))   // database size in pages
 	binary.BigEndian.PutUint32(Header[22+4:], uint32(FILE_CH_COUNTER)) // pagenumber of largest root node btree page
+	binary.BigEndian.PutUint32(Header[26+4:], uint32(TOTAL_PAGES))     // Total number of pages
 	binary.BigEndian.PutUint16(Header[48:], uint16(8))                 // end delimiter
 	// can do add other header things if needed
 	err := binary.Write(file, binary.BigEndian, Header) // magic code Brodb
 	if err != nil {
 
 		// FIXME: make the new error unable to make error
-		fmt.Errorf("%w... Error while adding the db file Header", err)
+		return fmt.Errorf("%w... Error while adding the db file Header", err)
 	}
 	return nil
 
