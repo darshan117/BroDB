@@ -9,33 +9,34 @@ import (
 )
 
 var (
-	BufData       BufPage // current buffer memory cache of the current page is stored here
-	PAGEHEAD_SIZE uint    = 14
-	MINCELLSIZE   uint    = 10
-	SLOT_SIZE     uint    = 2
-	// TODO: make global for the cell header size
+	BufData        BufPage // current buffer memory cache of the current page is stored here
+	PAGEHEAD_SIZE  uint    = 14
+	MINCELLSIZE    uint    = 10
+	SLOT_SIZE      uint    = 2
+	CELL_HEAD_SIZE uint    = 5
 )
 
 func MakePage(ptype PageType, id uint32) (PageHeader, error) {
 	// make the header for the newPage
 	pageHeader := make([]byte, Init.PAGE_SIZE)
-	fmt.Println("length is ", len(pageHeader))
 	page := PageHeader{
 		pageId:    id,
 		pageType:  ptype,
 		freeStart: uint16(PAGEHEAD_SIZE),
 		freeEnd:   uint16(Init.PAGE_SIZE),
-		flags:     1,
 		numSlots:  0,
+		flags:     8,
 	}
 	page.totalFree = page.freeEnd - page.freeStart
 	// setting the pageHeader
+	// BUG: make a different function for serialized the page header
 	binary.BigEndian.PutUint64(pageHeader[0:], uint64(page.pageId))
 	pageHeader[4] = byte(page.pageType)
 	binary.BigEndian.PutUint16(pageHeader[5:], uint16(page.freeStart))
 	binary.BigEndian.PutUint16(pageHeader[7:], uint16(page.freeEnd))
 	binary.BigEndian.PutUint16(pageHeader[9:], uint16(page.totalFree))
 	pageHeader[11] = byte(page.flags)
+	binary.BigEndian.PutUint16(pageHeader[12:], uint16(page.numSlots))
 	_, err := Init.Dbfile.Write(pageHeader)
 	if err != nil {
 		return PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
@@ -45,7 +46,6 @@ func MakePage(ptype PageType, id uint32) (PageHeader, error) {
 	if err != nil {
 		return PageHeader{}, fmt.Errorf("error while Loading the page | %w", err)
 	}
-	fmt.Println("bufdata is ", BufData.Data[30:34])
 	return page, nil
 }
 
@@ -69,10 +69,11 @@ func MakePageZero(ptype PageType, id uint32) (PageHeader, error) {
 		pageType:  ptype,
 		freeStart: uint16(PAGEHEAD_SIZE) + 50, // contains hardcoded pageheader size
 		freeEnd:   uint16(Init.PAGE_SIZE),
-		flags:     1,
 		numSlots:  0,
+		flags:     1,
 	}
 	page.totalFree = page.freeEnd - page.freeStart
+	// FIXME: make a different helper functiuon to serialize the page header
 	binary.BigEndian.PutUint64(pageHeader[0:], uint64(page.pageId))
 	pageHeader[4] = byte(page.pageType)
 	binary.BigEndian.PutUint16(pageHeader[5:], uint16(page.freeStart))
@@ -93,40 +94,43 @@ func MakePageZero(ptype PageType, id uint32) (PageHeader, error) {
 
 func (page *PageHeader) AddCell(cellContent []byte) error {
 	cellSize := len(cellContent)
-	var cellheader CellHeader
 	var cell Cell
 
-	cellheader.cellSize = uint16(cellSize)
-	cellheader.cellLoc = page.freeEnd
-	cellheader.isOverflow = true
-	cell.header = cellheader
-	cellSize += binary.Size(cellheader)
-	// totalCellSize := int(cellSize) + int(binary.Size(cellheader))
-	// fmt.Println("total size of the size is", binary.Size(cellheader))
+	cell.header.cellLoc = page.freeEnd
+	cell.header.isOverflow = false
+	cellSize += int(CELL_HEAD_SIZE)
 
+	// TODO: check if cell size is max size then make overflow page or new page for it
+
+	if cellSize > int(page.checkUsableSpace()) && cellSize < int(page.totalFree) {
+		err := page.Defragment()
+		if err != nil {
+			return err
+		}
+
+	}
 	if cellSize > int(page.checkUsableSpace()) && cellSize > int(MINCELLSIZE) {
-		// page.Defragment
-		// this should return the the new cell and change the cell content to its content
 		oflcell := page.makeOverflowCell(cellContent)
-		// fmt.Println(oflcell.serializeOverflow())
 		cell.cellContent = oflcell.serializeOverflow()
 		cell.header.isOverflow = true
+		cell.header.cellSize += uint16(len(cell.cellContent))
+
 		err := LoadPage(uint(page.pageId))
 		if err != nil {
 			return fmt.Errorf("error while Loading the page | %w", err)
 		}
 
-		// fmt.Println("cell size error ")
-		// return fmt.Errorf("error while adding cell |Cell Size %d larger than the free space %d", cellSize, page.totalFree)
 	} else {
 		cell.cellContent = cellContent
+		cell.header.cellSize = uint16(len(cell.cellContent))
+		// fmt.Println("cell headr size", cell.cellContent)
 
 	}
-	cellSer, n := cellheader.serializeCell(cell.cellContent)
-	fmt.Println("print size of cellser", n)
-	copy(BufData.Data[page.freeEnd-uint16(n):page.freeEnd], cellSer.Bytes())
+	cellSer, n := cell.header.serializeCell(cell.cellContent)
+	no := copy(BufData.Data[page.freeEnd-uint16(n):page.freeEnd], cellSer.Bytes())
+	// fmt.Println("print size of cell copied", no, n)
 
-	page.freeEnd -= uint16(n)
+	page.freeEnd -= uint16(no)
 	binary.BigEndian.PutUint16(BufData.Data[page.freeStart:page.freeStart+2], page.freeEnd)
 	page.freeStart += uint16(binary.Size(page.freeStart))
 	page.totalFree = page.freeEnd - page.freeStart
@@ -166,7 +170,6 @@ func LoadPage(pageNo uint) error {
 		return fmt.Errorf("error while reading file Info ... %w", err)
 	}
 	offset := BufData.pageNum * uint(Init.PAGE_SIZE)
-	// fmt.Println("offset ", offset)
 	mapSize := func() uint {
 		if offset+uint(Init.PAGE_SIZE) > uint(fileStat.Size()) {
 			return uint(fileStat.Size()) - offset
@@ -185,7 +188,8 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 		return fmt.Errorf("error while removing cell | index is greater than the max slots... ")
 
 	}
-	oldCell := page.GetCell(idx)
+	// FIXME: do the error checking for the func getcell
+	oldCell, _ := page.GetCell(idx)
 	page.totalFree += oldCell.header.cellSize
 	page.ShiftSlots(idx)
 	binary.BigEndian.PutUint16(BufData.Data[page.freeStart-2:page.freeStart], uint16(0))
@@ -216,8 +220,11 @@ func (page *PageHeader) SlotArray() map[uint16]PointerList {
 		offset := BufData.Data[i : i+2]
 		offsetVal := binary.BigEndian.Uint16(offset)
 		slot.index = uint16(id)
-		cell := page.GetCell(uint((i - PAGEHEAD_SIZE) / 2))
-
+		// FIXME:  do the error checking as getcell also returns the error
+		cell, err := page.GetCell(uint((i - PAGEHEAD_SIZE) / 2))
+		if err != nil {
+			fmt.Println(err)
+		}
 		slot.size = cell.header.cellSize
 		slotmap[offsetVal] = slot
 		i += 2
@@ -227,23 +234,36 @@ func (page *PageHeader) SlotArray() map[uint16]PointerList {
 
 }
 
-func (page *PageHeader) GetCell(idx uint) Cell {
+func (page *PageHeader) GetCell(idx uint) (Cell, error) {
+	// FIXME: changes in getcell check for if page is overflow
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	offset := BufData.Data[slotIndex : slotIndex+2]
 	offsetVal := binary.BigEndian.Uint16(offset)
-	// fmt.Println(offsetVal)
 	var cell Cell
 	cellHeaderSize := 5
 	cell.deserializeCell(BufData.Data[offsetVal : offsetVal+uint16(cellHeaderSize)+1])
-	// fmt.Printf("%+v  \n", cell)
-	// fmt.Println("from ", offsetVal+uint16(cellHeaderSize), "to ", cell.header.cellSize)
-
 	cell.cellContent = BufData.Data[offsetVal+uint16(cellHeaderSize) : offsetVal+uint16(cellHeaderSize)+cell.header.cellSize]
-	return cell
+	if cell.header.isOverflow {
+		// TODO:get the last 4 byte offset for the page
+
+		pageOffset := cell.cellContent[len(cell.cellContent)-4:]
+		ovPage := binary.BigEndian.Uint32(pageOffset)
+		ovPageHeader, err := ReadOverFlowPageHeader(uint(ovPage))
+		if err != nil {
+			return Cell{}, err
+		}
+		contents, err := ovPageHeader.ReadOverflowPage(uint(ovPage))
+		if err != nil {
+			return cell, err
+		}
+		// FIXME: get the full cell contents concatenated 4 byte header
+		fmt.Println("contents of the page are..", string(contents[4:]), "len is ", len(contents))
+
+	}
+	return cell, nil
 
 }
 
-// TODO: Get cell by offset
 func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
 	var cell Cell
 	cellHeaderSize := 5
@@ -258,13 +278,13 @@ func (page *PageHeader) fixSlot(index uint, offset uint16) {
 	binary.BigEndian.PutUint16(BufData.Data[slotIndex:slotIndex+2], offset)
 }
 
-// TODO: defragment the page move all the cells to the right and remove all the gaps between the page
 func (page *PageHeader) Defragment() error {
 
 	slotarray := page.SlotArray()
 	binheap := heap[uint16]{}
 	destPointer := uint16(4096)
-	for k, _ := range slotarray {
+	// HACK: did some changes here
+	for k := range slotarray {
 		binheap.add(k)
 	}
 	for i := 0; i < int(page.numSlots); i++ {
@@ -285,38 +305,31 @@ func (page *PageHeader) Defragment() error {
 }
 
 // overflow pages
-// TODO: struct for overflow page header
-
-// TODO: making overflow cell
 func (page *PageHeader) makeOverflowCell(cellContent []byte) OverflowPtr {
-	// [x] payload + overptr
 	var overflowptr OverflowPtr
-	// [x] check for the cellcontent if it can fit in the
 	space := page.checkUsableSpace()
 
-	newpayloadsize := len(cellContent) - (len(cellContent) - int(space)) - 4 - int(SLOT_SIZE) // FIXME: overflow ptr constant
-	fmt.Println("payload size is ", newpayloadsize, "len cell", len(cellContent), "space is ", space)
+	newpayloadsize := len(cellContent) - (len(cellContent) + int(CELL_HEAD_SIZE) - int(space)) - 4 - int(SLOT_SIZE) // FIXME: overflow ptr constant
 	NewPayload := cellContent[:newpayloadsize]
 	overflowptr.payload = NewPayload
 	IncrementTotalPages()
+	pageNo := Init.TOTAL_PAGES
 	MakeOverFlowPage(uint(Init.TOTAL_PAGES), cellContent[newpayloadsize:])
-	overflowptr.ptr = uint32(Init.TOTAL_PAGES)
-
-	// totalcellsize := uint(cell.header.cellSize) + uint(binary.Size(cell))
-
+	overflowptr.ptr = uint32(pageNo)
 	return overflowptr
 
 }
 
 func MakeOverFlowPage(pageNum uint, payload []byte) error {
 	var overflowHeader OverflowPageHeader
-	fmt.Println("size of the overflow header:", binary.Size(overflowHeader))
-	newpayload := payload[:]
+	payl := make([]byte, Init.PAGE_SIZE)
+	newpayload := payload
 
 	if len(payload) > Init.PAGE_SIZE-binary.Size(overflowHeader) {
 		lenPayload := Init.PAGE_SIZE - binary.Size(overflowHeader)
 		newpayload = payload[:lenPayload]
-		MakeOverFlowPage(pageNum+1, newpayload[lenPayload:])
+		fmt.Println(lenPayload, len(payload[lenPayload:]))
+		MakeOverFlowPage(pageNum+1, payload[lenPayload:])
 		overflowHeader.next = uint16(pageNum) + 1
 		overflowHeader.size = uint16(lenPayload)
 	} else {
@@ -324,12 +337,9 @@ func MakeOverFlowPage(pageNum uint, payload []byte) error {
 		overflowHeader.size = uint16(len(payload))
 
 	}
-	overH, _ := overflowHeader.serializeOverflowPage()
-	_, err := Init.Dbfile.Write(overH)
-	if err != nil {
-		return fmt.Errorf("%w... Error while adding the page  Header", err)
-	}
-	_, err = Init.Dbfile.Write(newpayload)
+	overflowHeader.serializeOverflowPage(payl)
+	copy(payl[4:], newpayload)
+	_, err := Init.Dbfile.WriteAt(payl, int64(Init.PAGE_SIZE)*int64(pageNum-1))
 	if err != nil {
 		return fmt.Errorf("%w... Error while adding the page  Header", err)
 	}
@@ -343,12 +353,9 @@ func MakeOverFlowPage(pageNum uint, payload []byte) error {
 	return nil
 }
 
-func (overflow *OverflowPageHeader) serializeOverflowPage() ([]byte, uint) {
-	var buf bytes.Buffer
-
-	binary.Write(&buf, binary.BigEndian, overflow.next)
-	binary.Write(&buf, binary.BigEndian, overflow.size)
-	return buf.Bytes(), uint(buf.Len())
+func (overflow *OverflowPageHeader) serializeOverflowPage(payload []byte) {
+	binary.BigEndian.PutUint16(payload[0:], overflow.next)
+	binary.BigEndian.PutUint16(payload[2:], overflow.size)
 
 }
 
@@ -361,23 +368,67 @@ func (overflow *OverflowPtr) serializeOverflow() []byte {
 
 }
 
-// [ ]  make func for checking the usable space
 func (page *PageHeader) checkUsableSpace() uint16 {
 	return page.freeEnd - page.freeStart
-
 }
 
-// TODO: make new overflow cell
-// TODO: Retrieve the overflow cell
-// FIXME: changes in getcell check for if page is overflow
 // how to work with the overflow pages
 
 // LATER: check for the space in slot array periodically and check if there is space for new one or append at the freeStart
 // TODO: debugging the page print the header and cell currently
 
+func (page *PageHeader) PageDebug() {
+	fmt.Printf(" %+v \n", page)
+	fmt.Printf(" Slot array:\n %+v \n", page.SlotArray())
+
+}
+
 // LATER: tommorrow also make the test cases for cell
 // LATER: drain function is important for the binary tree function
 // TODO: max allowed payload size ideal payload size
+
+// TODO: read the overflow
+func ReadOverFlowPageHeader(pageNo uint) (*OverflowPageHeader, error) {
+	// should i first read the header and call the read function
+	ovHeader := make([]byte, 4)
+	var overflowheader OverflowPageHeader
+	_, err := Init.Dbfile.ReadAt(ovHeader, int64(pageNo-1)*int64(Init.PAGE_SIZE))
+	if err != nil {
+		return nil, fmt.Errorf("%w | error while Reading from the overflow page Header", err)
+
+	}
+	overflowheader.next = binary.BigEndian.Uint16(ovHeader[:2])
+	overflowheader.size = binary.BigEndian.Uint16(ovHeader[2:4])
+	return &overflowheader, nil
+
+}
+
+func (ovheader *OverflowPageHeader) ReadOverflowPage(pageNo uint) ([]byte, error) {
+	size := ovheader.size
+	contents := make([]byte, size+4)
+	_, err := Init.Dbfile.ReadAt(contents, int64(pageNo-1)*int64(Init.PAGE_SIZE))
+	if err != nil {
+		return nil, fmt.Errorf("%w | error while Reading from the overflow page", err)
+
+	}
+	if ovheader.next != 0 {
+		newOverflowHeader, err := ReadOverFlowPageHeader(uint(ovheader.next))
+		if err != nil {
+			return nil, fmt.Errorf("%w ", err)
+
+		}
+		newContents, err := newOverflowHeader.ReadOverflowPage(uint(ovheader.next))
+		if err != nil {
+			return nil, fmt.Errorf("%w ", err)
+
+		}
+		contents = append(contents, newContents[4:]...)
+		// fmt.Println("length of newcontents is ", len(newContents), "contents ", newContents, "header.size is ", newOverflowHeader.size)
+
+	}
+	return contents, nil
+
+}
 
 // Later implementaions
 // LATER: payload should be serialized into some known format
