@@ -11,7 +11,6 @@ import (
 var file *os.File
 
 func init() {
-	// HACK: find a way to call the init and make page zero here
 	file = Init.Init()
 	// pagH, _ :=
 	pager.MakePageZero(22, 1)
