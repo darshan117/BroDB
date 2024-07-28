@@ -8,33 +8,28 @@ import (
 
 var (
 	BufData        BufPage
-	PAGEHEAD_SIZE  uint = 14
+	PAGEHEAD_SIZE  uint = 16
 	MINCELLSIZE    uint = 10
 	SLOT_SIZE      uint = 2
-	CELL_HEAD_SIZE uint = 5
+	CELL_HEAD_SIZE uint = 7
 )
 
-func MakePage(ptype PageType, id uint32) (PageHeader, error) {
+func MakePage(ptype PageType, id uint16) (PageHeader, error) {
 	pageHeader := make([]byte, Init.PAGE_SIZE)
 	page := PageHeader{
-		pageId:    id,
-		pageType:  ptype,
-		freeStart: uint16(PAGEHEAD_SIZE),
-		freeEnd:   uint16(Init.PAGE_SIZE),
-		numSlots:  0,
-		flags:     8,
+		pageId:         id,
+		pageType:       ptype,
+		freeStart:      uint16(PAGEHEAD_SIZE),
+		freeEnd:        uint16(Init.PAGE_SIZE),
+		numSlots:       0,
+		lastOffsetUsed: 0,
+		rightPointer:   0,
+		flags:          8,
 	}
 	page.totalFree = page.freeEnd - page.freeStart
-	// setting the pageHeader
-	// BUG: make a different function for serialized the page header
-	binary.BigEndian.PutUint32(pageHeader[0:], uint32(page.pageId))
-	pageHeader[4] = byte(page.pageType)
-	binary.BigEndian.PutUint16(pageHeader[5:], uint16(page.freeStart))
-	binary.BigEndian.PutUint16(pageHeader[7:], uint16(page.freeEnd))
-	binary.BigEndian.PutUint16(pageHeader[9:], uint16(page.totalFree))
-	pageHeader[11] = byte(page.flags)
-	binary.BigEndian.PutUint16(pageHeader[12:], uint16(page.numSlots))
-	_, err := Init.Dbfile.Write(pageHeader)
+	ser := page.serializePageHeader(pageHeader)
+	fmt.Printf("this is how page header %+v  \n", deserializePageHeader(ser))
+	_, err := Init.Dbfile.Write(ser)
 	if err != nil {
 		return PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
 	}
@@ -46,29 +41,26 @@ func MakePage(ptype PageType, id uint32) (PageHeader, error) {
 	return page, nil
 }
 
-func MakePageZero(ptype PageType, id uint32) (PageHeader, error) {
+func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 	pageHeader := make([]byte, Init.PAGE_SIZE-50)
 	page := PageHeader{
-		pageId:    id,
-		pageType:  ptype,
-		freeStart: uint16(PAGEHEAD_SIZE) + 50, // contains hardcoded pageheader size
-		freeEnd:   uint16(Init.PAGE_SIZE),
-		numSlots:  0,
-		flags:     1,
+		pageId:         id,
+		pageType:       ptype,
+		freeStart:      uint16(PAGEHEAD_SIZE) + 50, // contains hardcoded pageheader size
+		freeEnd:        uint16(Init.PAGE_SIZE),
+		numSlots:       0,
+		lastOffsetUsed: 0,
+		rightPointer:   0,
+		flags:          8,
 	}
 	page.totalFree = page.freeEnd - page.freeStart
 	// FIXME: make a different helper functiuon to serialize the page header
-	binary.BigEndian.PutUint64(pageHeader[0:], uint64(page.pageId))
-	pageHeader[4] = byte(page.pageType)
-	binary.BigEndian.PutUint16(pageHeader[5:], uint16(page.freeStart))
-	binary.BigEndian.PutUint16(pageHeader[7:], uint16(page.freeEnd))
-	binary.BigEndian.PutUint16(pageHeader[9:], uint16(page.totalFree))
-	pageHeader[11] = byte(page.flags)
+	ser := page.serializePageHeader(pageHeader)
 	_, err := Init.Dbfile.Seek(50, 0) // 0 means relative to the origin of the file
 	if err != nil {
 		return PageHeader{}, fmt.Errorf("error seeking to offset: %w", err)
 	}
-	_, err = Init.Dbfile.Write(pageHeader) // magic code Brodb
+	_, err = Init.Dbfile.Write(ser) // magic code Brodb
 	if err != nil {
 		return PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
 	}
@@ -76,7 +68,7 @@ func MakePageZero(ptype PageType, id uint32) (PageHeader, error) {
 
 }
 
-func (page *PageHeader) AddCell(cellContent []byte) error {
+func (page *PageHeader) AddCell(cellContent []byte, index ...int) error {
 	cellSize := len(cellContent)
 	var cell Cell
 
@@ -110,9 +102,18 @@ func (page *PageHeader) AddCell(cellContent []byte) error {
 	cellSer, n := cell.header.serializeCell(cell.cellContent)
 	no := copy(BufData.Data[page.freeEnd-uint16(n):page.freeEnd], cellSer.Bytes())
 	page.freeEnd -= uint16(no)
-	binary.BigEndian.PutUint16(BufData.Data[page.freeStart:page.freeStart+2], page.freeEnd)
-	page.freeStart += uint16(binary.Size(page.freeStart))
-	page.totalFree = page.freeEnd - page.freeStart
+
+	// adding slot
+	if len(index) != 0 {
+		page.InsertSlot(index[0], page.freeEnd)
+
+	} else {
+		binary.BigEndian.PutUint16(BufData.Data[page.freeStart:page.freeStart+2], page.freeEnd)
+
+	}
+	page.freeStart += uint16(SLOT_SIZE)
+	// BUG: add cell total free
+	page.totalFree -= uint16(no + int(SLOT_SIZE)) // +2
 	page.numSlots += 1
 	return nil
 
@@ -136,30 +137,6 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 
 // new implementaton
 
-func (page *PageHeader) SlotArray() map[uint16]PointerList {
-	var slotmap = make(map[uint16]PointerList)
-	startidx := PAGEHEAD_SIZE // page header size make it global
-	id := 0
-
-	for i := startidx; i < uint(page.freeStart); {
-		var slot PointerList
-		offset := BufData.Data[i : i+2]
-		offsetVal := binary.BigEndian.Uint16(offset)
-		slot.index = uint16(id)
-		// FIXME:  do the error checking as getcell also returns the error
-		cell, err := page.GetCell(uint((i - PAGEHEAD_SIZE) / 2))
-		if err != nil {
-			fmt.Println(err)
-		}
-		slot.size = cell.header.cellSize
-		slotmap[offsetVal] = slot
-		i += 2
-		id += 1
-	}
-	return slotmap
-
-}
-
 func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	offset := BufData.Data[slotIndex : slotIndex+2]
@@ -180,7 +157,7 @@ func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 			return cell, err
 		}
 		// FIXME: get the full cell contents concatenated 4 byte header
-		fmt.Println("contents of the page are..", string(contents[4:]), "len is ", len(contents))
+		fmt.Println("contents of the page are..", string(cell.cellContent[:len(cell.cellContent)-4])+string(contents[4:]), "len is ", len(contents))
 
 	}
 	return cell, nil
@@ -227,14 +204,19 @@ func (page *PageHeader) makeOverflowCell(cellContent []byte) OverflowPtr {
 	var overflowptr OverflowPtr
 	space := page.checkUsableSpace()
 
-	newpayloadsize := len(cellContent) - (len(cellContent) + int(CELL_HEAD_SIZE) - int(space)) - 4 - int(SLOT_SIZE) // FIXME: overflow ptr constant
-	NewPayload := cellContent[:newpayloadsize]
-	overflowptr.payload = NewPayload
-	IncrementTotalPages()
-	pageNo := Init.TOTAL_PAGES
-	MakeOverFlowPage(uint(Init.TOTAL_PAGES), cellContent[newpayloadsize:])
-	overflowptr.ptr = uint32(pageNo)
-	return overflowptr
+	newpayloadsize := int(space) - 4 - int(SLOT_SIZE) - int(CELL_HEAD_SIZE) // FIXME: overflow ptr constant
+	if newpayloadsize > 0 {
+		fmt.Println("newpayload size is ", len(cellContent))
+		NewPayload := cellContent[:newpayloadsize]
+		overflowptr.payload = NewPayload
+		IncrementTotalPages()
+		pageNo := Init.TOTAL_PAGES
+		MakeOverFlowPage(uint(Init.TOTAL_PAGES), cellContent[newpayloadsize:])
+		overflowptr.ptr = uint32(pageNo)
+		return overflowptr
+
+	}
+	return OverflowPtr{}
 
 }
 

@@ -36,6 +36,7 @@ var (
 	TOTAL_PAGES     = 1
 	FILE_CH_COUNTER = 0
 	DATABASE_SIZE   = 1 // in pages
+	ROOTPAGE        = 1 // in pages
 )
 
 // 							Database Header Format
@@ -74,6 +75,7 @@ func makeFileHeader(file *os.File) error {
 	binary.BigEndian.PutUint32(Header[18+4:], uint32(DATABASE_SIZE))   // database size in pages
 	binary.BigEndian.PutUint32(Header[22+4:], uint32(FILE_CH_COUNTER)) // pagenumber of largest root node btree page
 	binary.BigEndian.PutUint32(Header[26+4:], uint32(TOTAL_PAGES))     // Total number of pages
+	binary.BigEndian.PutUint32(Header[34:], uint32(ROOTPAGE))          // Total number of pages
 	binary.BigEndian.PutUint16(Header[48:], uint16(8))                 // end delimiter
 	// can do add other header things if needed
 	err := binary.Write(file, binary.BigEndian, Header) // magic code Brodb

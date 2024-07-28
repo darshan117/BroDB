@@ -39,7 +39,6 @@ func (node *BtreeNode) insertNotFull(key int) {
 
 		}
 		node.child[i+1].insertNotFull(key)
-
 	}
 
 }

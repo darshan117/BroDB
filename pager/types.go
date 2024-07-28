@@ -6,20 +6,20 @@ const (
 	ROOTPAGE = iota
 	INTERIOR
 	LEAF
+	ROOT_AND_LEAF
 )
 
 type PageHeader struct {
-	pageId    uint32
-	pageType  PageType
-	freeStart uint16 // start of freespace
-	freeEnd   uint16
-	totalFree uint16
-	numSlots  uint16
-	flags     uint8
-	// TODO: add the rightmost child pointer
-	// also last offset used
-	// number of slots used
-	// should contain the right most child
+	// FIXME: might need to remove the pageId
+	pageId         uint16
+	pageType       PageType
+	freeStart      uint16
+	freeEnd        uint16
+	totalFree      uint16
+	numSlots       uint16
+	lastOffsetUsed uint16
+	rightPointer   uint16
+	flags          uint8
 }
 type OverflowPageHeader struct {
 	next uint16
@@ -35,7 +35,7 @@ type CellHeader struct {
 	cellSize   uint16
 	isOverflow bool
 	// TODO: implement the leftmost child pointer for the given key
-	// leftChild pageNum
+	leftChild uint16
 }
 type Cell struct {
 	header      CellHeader
@@ -43,8 +43,9 @@ type Cell struct {
 }
 
 type PointerList struct {
-	index uint16
-	size  uint16
+	index    uint16
+	size     uint16
+	contents []byte
 }
 
 type BufPage struct {
