@@ -40,9 +40,9 @@ func main() {
 	// rootpage.PageDebug()
 	// rootpage.InsertSlot(0)
 
-	fmt.Println(rootpage.GetSlots())
+	// fmt.Println(rootpage.GetSlots())
 
-	rootpage.PageDebug()
+	// rootpage.PageDebug()
 
 	defer file.Close()
 

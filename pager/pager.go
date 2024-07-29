@@ -28,7 +28,6 @@ func MakePage(ptype PageType, id uint16) (PageHeader, error) {
 	}
 	page.totalFree = page.freeEnd - page.freeStart
 	ser := page.serializePageHeader(pageHeader)
-	fmt.Printf("this is how page header %+v  \n", deserializePageHeader(ser))
 	_, err := Init.Dbfile.Write(ser)
 	if err != nil {
 		return PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
@@ -68,7 +67,7 @@ func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 
 }
 
-func (page *PageHeader) AddCell(cellContent []byte, index ...int) error {
+func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error {
 	cellSize := len(cellContent)
 	var cell Cell
 
@@ -99,17 +98,18 @@ func (page *PageHeader) AddCell(cellContent []byte, index ...int) error {
 		cell.cellContent = cellContent
 		cell.header.cellSize = uint16(len(cell.cellContent))
 	}
+
+	if len(opt) > 0 && opt[0].LeftPointer != nil {
+		cell.header.leftChild = *opt[0].LeftPointer
+	}
+
 	cellSer, n := cell.header.serializeCell(cell.cellContent)
 	no := copy(BufData.Data[page.freeEnd-uint16(n):page.freeEnd], cellSer.Bytes())
 	page.freeEnd -= uint16(no)
-
-	// adding slot
-	if len(index) != 0 {
-		page.InsertSlot(index[0], page.freeEnd)
-
+	if len(opt) > 0 && opt[0].Index != nil {
+		page.InsertSlot(*opt[0].Index, page.freeEnd)
 	} else {
 		binary.BigEndian.PutUint16(BufData.Data[page.freeStart:page.freeStart+2], page.freeEnd)
-
 	}
 	page.freeStart += uint16(SLOT_SIZE)
 	// BUG: add cell total free
@@ -120,15 +120,15 @@ func (page *PageHeader) AddCell(cellContent []byte, index ...int) error {
 }
 
 func (page *PageHeader) RemoveCell(idx uint) error {
+	// do a page load here
 	if idx > uint(page.numSlots)-1 {
 		return fmt.Errorf("error while removing cell | index is greater than the max slots... ")
-
 	}
 	// FIXME: do the error checking for the func getcell
 	oldCell, _ := page.GetCell(idx)
 	page.totalFree += oldCell.header.cellSize
+	page.totalFree += uint16(CELL_HEAD_SIZE)
 	page.ShiftSlots(idx)
-	binary.BigEndian.PutUint16(BufData.Data[page.freeStart-2:page.freeStart], uint16(0))
 	page.freeStart -= 2
 	page.numSlots -= 1
 	page.totalFree += 2 // slot size has

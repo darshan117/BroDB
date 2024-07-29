@@ -116,6 +116,7 @@ func (page *PageHeader) ShiftSlots(idx uint) {
 		slotIndex += 2
 
 	}
+	binary.BigEndian.PutUint16(BufData.Data[page.freeStart-2:page.freeStart], uint16(0))
 }
 func (page *PageHeader) InsertSlot(idx int, offsetVal uint16) {
 	if page.numSlots > 0 {
@@ -128,6 +129,21 @@ func (page *PageHeader) InsertSlot(idx int, offsetVal uint16) {
 		binary.BigEndian.PutUint16(BufData.Data[slotid:slotid+2], offsetVal)
 
 	}
+
+}
+
+// TODO: range remove slots
+func (page *PageHeader) RangeRemoveSlots(start uint, end uint) {
+	// shiftslots starting from   start index
+	for i := start; i < end; i++ {
+		oldCell, _ := page.GetCell(i)
+		page.totalFree += oldCell.header.cellSize
+		page.totalFree += uint16(CELL_HEAD_SIZE)
+		page.ShiftSlots(i)
+		page.freeStart -= 2
+		page.totalFree += 2 // slot size has
+	}
+	page.numSlots -= uint16(end) - uint16(start)
 
 }
 
@@ -173,6 +189,16 @@ func (page *PageHeader) fixSlot(index uint, offset uint16) {
 	binary.BigEndian.PutUint16(BufData.Data[slotIndex:slotIndex+2], offset)
 }
 
+func (page *PageHeader) GetKeys() []uint64 {
+	keys := make([]uint64, 0)
+	for _, val := range page.GetSlots() {
+		cell := page.GetCellByOffset(val)
+		res := binary.BigEndian.Uint64(cell.cellContent)
+		keys = append(keys, res)
+	}
+	return keys
+
+}
 func (page *PageHeader) PageDebug() {
 	fmt.Printf(" %+v \n", page)
 	fmt.Printf("%+v \n", page.SlotArray())

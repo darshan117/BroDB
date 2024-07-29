@@ -41,6 +41,10 @@ type Cell struct {
 	header      CellHeader
 	cellContent []byte
 }
+type AddCellOptions struct {
+	Index       *int
+	LeftPointer *uint16
+}
 
 type PointerList struct {
 	index    uint16
