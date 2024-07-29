@@ -15,6 +15,9 @@ var (
 )
 
 func MakePage(ptype PageType, id uint16) (PageHeader, error) {
+	if ptype == ROOTPAGE {
+		Init.UpdateRootPage(uint(id))
+	}
 	pageHeader := make([]byte, Init.PAGE_SIZE)
 	page := PageHeader{
 		pageId:         id,
@@ -68,6 +71,14 @@ func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 }
 
 func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error {
+	defer page.UpdatePageHeader()
+	if page.pageId != uint16(BufData.pageNum) {
+		err := LoadPage(uint(page.pageId))
+		if err != nil {
+			return err
+		}
+	}
+
 	cellSize := len(cellContent)
 	var cell Cell
 
@@ -115,11 +126,13 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 	// BUG: add cell total free
 	page.totalFree -= uint16(no + int(SLOT_SIZE)) // +2
 	page.numSlots += 1
+
 	return nil
 
 }
 
 func (page *PageHeader) RemoveCell(idx uint) error {
+	defer page.UpdatePageHeader()
 	// do a page load here
 	if idx > uint(page.numSlots)-1 {
 		return fmt.Errorf("error while removing cell | index is greater than the max slots... ")
@@ -174,6 +187,7 @@ func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
 }
 
 func (page *PageHeader) Defragment() error {
+	defer page.UpdatePageHeader()
 
 	slotarray := page.SlotArray()
 	binheap := heap[uint16]{}

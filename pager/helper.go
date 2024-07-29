@@ -42,11 +42,24 @@ func deserializePageHeader(pageHeader []byte) PageHeader {
 	header.freeStart = binary.BigEndian.Uint16(pageHeader[3:5])
 	header.freeEnd = binary.BigEndian.Uint16(pageHeader[5:7])
 	header.totalFree = binary.BigEndian.Uint16(pageHeader[7:9])
-	header.numSlots = binary.BigEndian.Uint16(pageHeader[9:11])
+	header.numSlots = binary.BigEndian.Uint16(pageHeader[9:])
 	header.lastOffsetUsed = binary.BigEndian.Uint16(pageHeader[11:13])
 	header.rightPointer = binary.BigEndian.Uint16(pageHeader[13:15])
 	header.flags = pageHeader[15]
 	return header
+
+}
+func (page *PageHeader) UpdatePageHeader() {
+	if page.pageId != uint16(BufData.pageNum) {
+		err := LoadPage(uint(page.pageId))
+		if err != nil {
+			// FIXME: do error handling here
+			fmt.Println(err)
+		}
+	}
+	pageHeader := make([]byte, PAGEHEAD_SIZE)
+	page.serializePageHeader(pageHeader)
+	copy(BufData.Data[:PAGEHEAD_SIZE], pageHeader)
 
 }
 
@@ -106,6 +119,7 @@ func LoadPage(pageNo uint) error {
 	if err != nil {
 		return fmt.Errorf("error is %w", err)
 	}
+	BufData.pageNum = pageNo
 	return nil
 }
 
@@ -134,6 +148,7 @@ func (page *PageHeader) InsertSlot(idx int, offsetVal uint16) {
 
 // TODO: range remove slots
 func (page *PageHeader) RangeRemoveSlots(start uint, end uint) {
+	defer page.UpdatePageHeader()
 	// shiftslots starting from   start index
 	for i := start; i < end; i++ {
 		oldCell, _ := page.GetCell(i)
@@ -190,9 +205,14 @@ func (page *PageHeader) fixSlot(index uint, offset uint16) {
 }
 
 func (page *PageHeader) GetKeys() []uint64 {
+	// if page.pageId != uint16(BufData.pageNum) {
+	// FIXME: do error handling here
+	newPage, _ := GetPage(uint(page.pageId))
+	// 	return newPage.GetKeys()
+	// }
 	keys := make([]uint64, 0)
 	for _, val := range page.GetSlots() {
-		cell := page.GetCellByOffset(val)
+		cell := newPage.GetCellByOffset(val)
 		res := binary.BigEndian.Uint64(cell.cellContent)
 		keys = append(keys, res)
 	}
@@ -203,6 +223,15 @@ func (page *PageHeader) PageDebug() {
 	fmt.Printf(" %+v \n", page)
 	fmt.Printf("%+v \n", page.SlotArray())
 
+}
+
+func GetPage(id uint) (*PageHeader, error) {
+	err := LoadPage(uint(id))
+	if err != nil {
+		return &PageHeader{}, fmt.Errorf("error while Loading the page | %w", err)
+	}
+	page := deserializePageHeader(BufData.Data)
+	return &page, nil
 }
 
 func (overflow *OverflowPageHeader) serializeOverflowPage(payload []byte) {

@@ -88,6 +88,19 @@ func makeFileHeader(file *os.File) error {
 
 }
 
+func UpdateRootPage(pageNo uint) error {
+	buff := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(buff, uint32(pageNo))
+	_, err := Dbfile.WriteAt(buff, 34) // 0 means relative to the origin of the file
+	if err != nil {
+		return fmt.Errorf("error changing the rootpage: %w", err)
+	}
+	ROOTPAGE = int(pageNo)
+	return nil
+
+}
+
 // make the serialize function for page of 4096 bytes and way to fit all the cell
 
 // make the datapage with the gob encoding in order to store the data
