@@ -295,14 +295,17 @@ func (page *PageHeader) checkUsableSpace() uint16 {
 }
 
 // TODO: Update left Pointer
-func (cell *Cell) UpdateLeftPointer(newLoc uint) {
+func (node *PageHeader) UpdateLeftPointer(newLoc uint, cell *Cell) {
 	cell.header.leftChild = uint16(newLoc)
 	cellLocation := cell.header.cellLoc
+	fmt.Printf("cell location is %d %+v \n", cellLocation, cell)
 	cellSer, n := cell.header.serializeCell(cell.cellContent)
 	// check if it is correct
-	copy(BufData.Data[cellLocation-uint16(n):cellLocation], cellSer.Bytes())
+	// newCell := node.GetCellByOffset(cellLocation)
+	fmt.Printf("the new cell is %+v\n ", cell.cellContent)
+	no := copy(BufData.Data[cellLocation-uint16(n):cellLocation], cellSer.Bytes())
 	var newcell Cell
-	newcell.deserializeCell(BufData.Data[cellLocation-uint16(n) : cellLocation])
+	newcell.deserializeCell(BufData.Data[cellLocation-uint16(no) : cellLocation])
 	fmt.Printf("%+v left pointer is updated ", newcell)
 }
 func (page *PageHeader) UpdateRightPointer(newLoc uint) {
@@ -312,4 +315,5 @@ func (page *PageHeader) UpdateRightPointer(newLoc uint) {
 }
 
 // TODO: Update the right Pointer
+// use the db.write for updating right pointer or update pageheader() will work here
 // TODO: fixPointers Function as a wrapper for the updateleftPointer and updaterightPointer

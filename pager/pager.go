@@ -151,6 +151,11 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 // new implementaton
 
 func (page *PageHeader) GetCell(idx uint) (Cell, error) {
+	if page.pageId != uint16(BufData.pageNum) {
+		// FIXME: do error handling here
+		newPage, _ := GetPage(uint(page.pageId))
+		return newPage.GetCell(idx)
+	}
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	offset := BufData.Data[slotIndex : slotIndex+2]
 	offsetVal := binary.BigEndian.Uint16(offset)
