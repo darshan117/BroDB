@@ -14,7 +14,7 @@ var (
 	CELL_HEAD_SIZE uint = 7
 )
 
-func MakePage(ptype PageType, id uint16) (PageHeader, error) {
+func MakePage(ptype PageType, id uint16) (*PageHeader, error) {
 	if ptype == ROOTPAGE {
 		Init.UpdateRootPage(uint(id))
 	}
@@ -33,14 +33,14 @@ func MakePage(ptype PageType, id uint16) (PageHeader, error) {
 	ser := page.serializePageHeader(pageHeader)
 	_, err := Init.Dbfile.Write(ser)
 	if err != nil {
-		return PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
+		return &PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
 	}
 	IncrementTotalPages()
 	err = LoadPage(uint(id))
 	if err != nil {
-		return PageHeader{}, fmt.Errorf("error while Loading the page | %w", err)
+		return &PageHeader{}, fmt.Errorf("error while Loading the page | %w", err)
 	}
-	return page, nil
+	return &page, nil
 }
 
 func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {

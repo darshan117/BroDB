@@ -147,18 +147,59 @@ func (page *PageHeader) InsertSlot(idx int, offsetVal uint16) {
 }
 
 // TODO: range remove slots
-func (page *PageHeader) RangeRemoveSlots(start uint, end uint) {
+func (page *PageHeader) EndRangeRemoveSlots(start uint, end uint) {
 	defer page.UpdatePageHeader()
 	// shiftslots starting from   start index
+	freeSpace := uint16(0)
+	freestart := uint16(0)
 	for i := start; i < end; i++ {
 		oldCell, _ := page.GetCell(i)
-		page.totalFree += oldCell.header.cellSize
-		page.totalFree += uint16(CELL_HEAD_SIZE)
-		page.ShiftSlots(i)
-		page.freeStart -= 2
-		page.totalFree += 2 // slot size has
+
+		freeSpace += oldCell.header.cellSize
+		freeSpace += uint16(CELL_HEAD_SIZE)
+		// page.ShiftSlots(i)
+		freestart += 2
+		freeSpace += 2 // slot size has
 	}
+	page.rangeRemove(start, end)
 	page.numSlots -= uint16(end) - uint16(start)
+	page.totalFree += freeSpace
+	page.freeStart -= freestart
+
+}
+func (page *PageHeader) StartRangeRemoveSlots(start uint, end uint) {
+	defer page.UpdatePageHeader()
+	// shiftslots starting from   start index
+	freeSpace := uint16(0)
+	freestart := uint16(0)
+	for i := start; i < end; i++ {
+		oldCell, _ := page.GetCell(i)
+
+		freeSpace += oldCell.header.cellSize
+		freeSpace += uint16(CELL_HEAD_SIZE)
+		page.ShiftSlots(i)
+		freestart += 2
+		freeSpace += 2 // slot size has
+	}
+	// page.rangeRemove(start, end)
+	page.numSlots -= uint16(end) - uint16(start)
+	page.totalFree += freeSpace
+	page.freeStart -= freestart
+
+}
+
+func (page *PageHeader) rangeRemove(start uint, end uint) {
+	startIndex := PAGEHEAD_SIZE + start*2
+	endIndex := PAGEHEAD_SIZE + (end)*2
+	var buf bytes.Buffer
+	for i := 0; i < int(end-start); i++ {
+		binary.Write(&buf, binary.BigEndian, uint16(0))
+	}
+	fmt.Println("before ", BufData.Data[:40])
+	copy(BufData.Data[startIndex:endIndex], BufData.Data[endIndex:page.freeStart])
+	// fmt.Println("after ", BufData.Data[startIndex:endIndex])
+	copy(BufData.Data[endIndex:page.freeStart], buf.Bytes())
+	fmt.Println("after ", BufData.Data[:40])
 
 }
 
@@ -252,3 +293,23 @@ func (overflow *OverflowPtr) serializeOverflow() []byte {
 func (page *PageHeader) checkUsableSpace() uint16 {
 	return page.freeEnd - page.freeStart
 }
+
+// TODO: Update left Pointer
+func (cell *Cell) UpdateLeftPointer(newLoc uint) {
+	cell.header.leftChild = uint16(newLoc)
+	cellLocation := cell.header.cellLoc
+	cellSer, n := cell.header.serializeCell(cell.cellContent)
+	// check if it is correct
+	copy(BufData.Data[cellLocation-uint16(n):cellLocation], cellSer.Bytes())
+	var newcell Cell
+	newcell.deserializeCell(BufData.Data[cellLocation-uint16(n) : cellLocation])
+	fmt.Printf("%+v left pointer is updated ", newcell)
+}
+func (page *PageHeader) UpdateRightPointer(newLoc uint) {
+	page.rightPointer = uint16(newLoc)
+	page.UpdatePageHeader()
+
+}
+
+// TODO: Update the right Pointer
+// TODO: fixPointers Function as a wrapper for the updateleftPointer and updaterightPointer
