@@ -42,34 +42,22 @@ func (page *PageHeader) InsertNonfull(key uint64) (*PageHeader, error) {
 	}
 	// FIXME: might remove the below if statement
 	if page.pageType == ROOTPAGE || page.pageType == INTERIOR {
-		// can keep it zero as well
-
 		for i, val := range page.GetSlots() {
 			cell := page.GetCellByOffset(val)
-			// check if the page is full
 			res := binary.BigEndian.Uint64(cell.cellContent)
 			if res > key {
-				// break and get the value i
-				// fmt.Println(index)
 				leftcell, _ := page.GetCell(uint(i))
 				childPage, err := GetPage(uint(leftcell.header.leftChild))
-				fmt.Println("num of slots are ", childPage.numSlots)
-
 				if err != nil {
 					return nil, err
 				}
 				if childPage.numSlots == NODEFULL {
-					// add index here add return
-					fmt.Printf("the new cell content is %+v\n ", leftcell)
-
 					page.SplitPagesLeft(i, cell.header.leftChild)
 					return page.InsertNonfull(key)
 				} else if leftcell.header.leftChild != uint16(0) {
 					page = childPage
 					return page.InsertNonfull(key)
-
 				}
-
 			}
 		}
 
@@ -79,11 +67,8 @@ func (page *PageHeader) InsertNonfull(key uint64) (*PageHeader, error) {
 				return nil, err
 			}
 			if rightChildPage.numSlots == NODEFULL {
-				return rightChildPage.SplitPagesRightAndInsert(page, key)
-				// page.InsertNonfull(key)
-
-				// page.UpdatePageHeader()
-				// fmt.Printf("New right after split Page %+v \n ", page.rightPointer)
+				rightChildPage.SplitPagesRightAndInsert(page, key)
+				return page.InsertNonfull(key)
 
 			}
 			page = rightChildPage
@@ -143,24 +128,11 @@ func (node *PageHeader) Insert(val uint64) (*PageHeader, error) {
 
 func (childPage *PageHeader) SplitPagesRightAndInsert(node *PageHeader, key uint64) (*PageHeader, error) {
 	defer childPage.UpdatePageHeader()
-	// defer node.UpdatePageHeader()
-	// should handle both cases of interior node and leaf node
-	// splitPage, err := GetPage(uint(index))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// get its left cell
-	// childPage, err := GetPage(uint(splitpage))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println("splitVal is ", splitVal, splitPage.GetKeys())
 	splitVal := childPage.GetKeys()[Degree-1]
 	keyPairs := make([]NodeComponent, 0)
 
 	for _, v := range childPage.GetSlots()[Degree:childPage.numSlots] {
 		cell := childPage.GetCellByOffset(v)
-		// key := binary.BigEndian.Uint64(cell.cellContent)
 		keyPairs = append(keyPairs, NodeComponent{
 			key:         cell.cellContent,
 			LeftPointer: cell.header.leftChild,
@@ -180,64 +152,31 @@ func (childPage *PageHeader) SplitPagesRightAndInsert(node *PageHeader, key uint
 		return nil, err
 	}
 	for _, v := range keyPairs {
-		// This should be a newPage
 		newPage.AddCell(v.key, AddCellOptions{LeftPointer: &v.LeftPointer})
 	}
 	childPage.StartRangeRemoveSlots(Degree-1, uint(childPage.numSlots))
 	node.Insertkey(splitVal, childPage.pageId)
 	node.rightPointer = newPage.pageId
 	node.UpdatePageHeader()
-
-	// node.InsertNonfull(key)
-	npage, _ := GetPage(3)
-	ncell, _ := npage.GetCell(3)
-	fmt.Printf("New npage right Page %+v \n ", ncell)
-
-	// 0 to splitval copy all the cells with their left pointer to the newPage
-
-	// fix pointers is hard
-	// node.fixPointer() here node.inserted new key  will have left pointer to the newPage
-	// newPage.rightPointer to node.leftPointer
-
-	// insert the split val to node
-	// TODO: node.inset(splitVal) which will insert the
-
-	// if append to last then right child is right pointer or else
-	// make a parent insert function necessary
-	// how will it work if append to last then right child is right pointer
-	// if insert inbetween then next key will get the left pointer as the  after values of split (range remove 0 to splitval index)
-	// splitkey will has starting vals to the left pointer
-
-	// TODO: make a seperate function to update left pointer and update right pointer
 	return nil, nil
-
 }
 
 // --------
 
 func (node *PageHeader) SplitPagesLeft(index int, splitpage uint16) (*PageHeader, error) {
-	// should handle both cases of interior node and leaf node
-	// splitPage, err := GetPage(uint(index))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// get its left cell
 	leftcell, err := node.GetCell(uint(index))
 	if err != nil {
 		return nil, err
 	}
-	parentVal := binary.BigEndian.Uint64(leftcell.cellContent)
 	childPage, err := GetPage(uint(splitpage))
 	if err != nil {
 		return nil, err
 	}
 	splitVal := childPage.GetKeys()[Degree-1]
-	// fmt.Println("splitVal is ", splitVal, splitPage.GetKeys())
 	keyPairs := make([]NodeComponent, 0)
 
 	for _, v := range childPage.GetSlots()[:Degree-1] {
 		cell := childPage.GetCellByOffset(v)
-		// key := binary.BigEndian.Uint64(cell.cellContent)
 		keyPairs = append(keyPairs, NodeComponent{
 			key:         cell.cellContent,
 			LeftPointer: cell.header.leftChild,
@@ -257,49 +196,15 @@ func (node *PageHeader) SplitPagesLeft(index int, splitpage uint16) (*PageHeader
 		return nil, err
 	}
 	for _, v := range keyPairs {
-		// This should be a newPage
 		newPage.AddCell(v.key, AddCellOptions{LeftPointer: &v.LeftPointer})
 	}
-	fmt.Printf("New Page %+v %d\n ", newPage.GetKeys(), index)
-	// check if degree or degree -1
-	// childpage becomes the leftpointer to the inserted node
-	// RangeRemove not working right
-	if parentVal > splitVal {
-		fmt.Printf("Child Page %+v %d\n ", childPage.GetKeys(), index)
-		childPage.EndRangeRemoveSlots(0, Degree)
-		fmt.Println(splitVal)
-		node.Insertkey(uint64(splitVal), newPage.pageId)
-		insertedcell, _ := node.GetCell(0)
-		fmt.Printf("inserted cell %+v %d %d \n ", insertedcell, childPage.pageId, leftcell.header.leftChild)
-
-	} else {
-		node.StartRangeRemoveSlots(Degree-1, uint(node.numSlots))
-
-	}
-
-	// 0 to splitval copy all the cells with their left pointer to the newPage
+	childPage.EndRangeRemoveSlots(0, Degree)
+	node.Insertkey(uint64(splitVal), newPage.pageId)
 	newPage.UpdateLeftPointer(uint(newPage.pageId), &leftcell)
-
-	// fix pointers is hard
-	// node.fixPointer() here node.inserted new key  will have left pointer to the newPage
-	// newPage.rightPointer to node.leftPointer
-
-	// insert the split val to node
-	// TODO: node.inset(splitVal) which will insert the
-
-	// if append to last then right child is right pointer or else
-	// make a parent insert function necessary
-	// how will it work if append to last then right child is right pointer
-	// if insert inbetween then next key will get the left pointer as the  after values of split (range remove 0 to splitval index)
-	// splitkey will has starting vals to the left pointer
-
-	// TODO: make a seperate function to update left pointer and update right pointer
 	return nil, nil
-
 }
 
 func (node *PageHeader) SplitRootPages() (*PageHeader, error) {
-	// should handle the pointers as well
 	defer node.UpdatePageHeader()
 	keys := node.GetKeys()
 	splitVal := keys[(Degree - 1)]
