@@ -157,49 +157,66 @@ func (page *PageHeader) EndRangeRemoveSlots(start uint, end uint) {
 
 		freeSpace += oldCell.header.cellSize
 		freeSpace += uint16(CELL_HEAD_SIZE)
-		// page.ShiftSlots(i)
 		freestart += 2
 		freeSpace += 2 // slot size has
 	}
-	page.rangeRemove(start, end)
+	page.rangeRemoveEnd(start, end)
 	page.numSlots -= uint16(end) - uint16(start)
 	page.totalFree += freeSpace
 	page.freeStart -= freestart
 
 }
 func (page *PageHeader) StartRangeRemoveSlots(start uint, end uint) {
-	defer page.UpdatePageHeader()
 	// shiftslots starting from   start index
+	if page.pageId != uint16(BufData.pageNum) {
+		LoadPage(uint(page.pageId))
+	}
+	// fmt.Println("before ", BufData.Data[:40])
+
 	freeSpace := uint16(0)
 	freestart := uint16(0)
 	for i := start; i < end; i++ {
 		oldCell, _ := page.GetCell(i)
-
 		freeSpace += oldCell.header.cellSize
 		freeSpace += uint16(CELL_HEAD_SIZE)
-		page.ShiftSlots(i)
 		freestart += 2
 		freeSpace += 2 // slot size has
+		page.ShiftSlots(i)
 	}
 	// page.rangeRemove(start, end)
+	page.rangeRemovestart(start, end)
 	page.numSlots -= uint16(end) - uint16(start)
 	page.totalFree += freeSpace
 	page.freeStart -= freestart
+	page.UpdatePageHeader()
+	// fmt.Println("after ", BufData.Data[:40])
+
+}
+func (page *PageHeader) rangeRemovestart(start uint, end uint) {
+	if page.pageId != uint16(BufData.pageNum) {
+		LoadPage(uint(page.pageId))
+	}
+	endIndex := PAGEHEAD_SIZE + (end)*2
+	var buf bytes.Buffer
+	for i := 0; i < int(end-start); i++ {
+		binary.Write(&buf, binary.BigEndian, uint16(0))
+	}
+	// copy(BufData.Data[PAGEHEAD_SIZE:startIndex], BufData.Data[startIndex:endIndex])
+	// fmt.Println("after ", BufData.Data[startIndex:endIndex])
+	copy(BufData.Data[endIndex:page.freeStart], buf.Bytes())
 
 }
 
-func (page *PageHeader) rangeRemove(start uint, end uint) {
+func (page *PageHeader) rangeRemoveEnd(start uint, end uint) {
 	startIndex := PAGEHEAD_SIZE + start*2
 	endIndex := PAGEHEAD_SIZE + (end)*2
 	var buf bytes.Buffer
 	for i := 0; i < int(end-start); i++ {
 		binary.Write(&buf, binary.BigEndian, uint16(0))
 	}
-	fmt.Println("before ", BufData.Data[:40])
 	copy(BufData.Data[startIndex:endIndex], BufData.Data[endIndex:page.freeStart])
 	// fmt.Println("after ", BufData.Data[startIndex:endIndex])
 	copy(BufData.Data[endIndex:page.freeStart], buf.Bytes())
-	fmt.Println("after ", BufData.Data[:40])
 
 }
 
@@ -298,15 +315,15 @@ func (page *PageHeader) checkUsableSpace() uint16 {
 func (node *PageHeader) UpdateLeftPointer(newLoc uint, cell *Cell) {
 	cell.header.leftChild = uint16(newLoc)
 	cellLocation := cell.header.cellLoc
-	fmt.Printf("cell location is %d %+v \n", cellLocation, cell)
+	// fmt.Printf("cell location is %d %+v \n", cellLocation, cell)
 	cellSer, n := cell.header.serializeCell(cell.cellContent)
 	// check if it is correct
 	// newCell := node.GetCellByOffset(cellLocation)
-	fmt.Printf("the new cell is %+v\n ", cell.cellContent)
+	// fmt.Printf("the new cell is %+v\n ", cell.cellContent)
 	no := copy(BufData.Data[cellLocation-uint16(n):cellLocation], cellSer.Bytes())
 	var newcell Cell
 	newcell.deserializeCell(BufData.Data[cellLocation-uint16(no) : cellLocation])
-	fmt.Printf("%+v left pointer is updated ", newcell)
+	// fmt.Printf("%+v left pointer is updated ", newcell)
 }
 func (page *PageHeader) UpdateRightPointer(newLoc uint) {
 	page.rightPointer = uint16(newLoc)
