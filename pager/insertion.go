@@ -176,7 +176,13 @@ func (node *PageHeader) SplitPagesLeft(index int, splitpage uint16) (*PageHeader
 	if err != nil {
 		return nil, err
 	}
-	splitVal := childPage.GetKeys()[Degree-1]
+	splitcell, err := childPage.GetCell(uint(Degree - 1))
+	if err != nil {
+		return nil, err
+	}
+
+	splitVal := binary.BigEndian.Uint64(splitcell.cellContent)
+	splitleftKey := splitcell.header.leftChild
 	keyPairs := make([]NodeComponent, 0)
 
 	for _, v := range childPage.GetSlots()[:Degree-1] {
@@ -203,7 +209,10 @@ func (node *PageHeader) SplitPagesLeft(index int, splitpage uint16) (*PageHeader
 		newPage.AddCell(v.key, AddCellOptions{LeftPointer: &v.LeftPointer})
 	}
 	childPage.EndRangeRemoveSlots(0, Degree)
+
 	node.Insertkey(uint64(splitVal), newPage.pageId)
+	newPage.rightPointer = splitleftKey
+	newPage.UpdatePageHeader()
 	return nil, nil
 }
 
@@ -256,8 +265,8 @@ func (node *PageHeader) SplitRootPages() (*PageHeader, error) {
 
 		node.UpdateRightPointer(uint(splitLeftkey), newPage)
 		// nodecell, _ := node.GetCell(3)
-		newp, _ := GetPage(6)
-		fmt.Printf("split page is %+v\n", newp.GetKeys())
+		// newp, _ := GetPage(6)
+		// fmt.Printf("split page is %+v\n", newp.GetKeys())
 		// BUG: might be some bug here
 		rootpage, err := MakePage(ROOTPAGE, uint16(Init.TOTAL_PAGES))
 		if err != nil {
@@ -304,39 +313,50 @@ func (page *PageHeader) Insertkey(key uint64, leftchild uint16) (*PageHeader, er
 	return nil, nil
 }
 
-func BtreeTraversal() error {
+func BtreeTraversal() (*[][][]uint64, error) {
 	RootNode, err := GetPage(uint(Init.ROOTPAGE))
 	if err != nil {
-		return fmt.Errorf("error while insert to the btree %w", err)
+		return nil, fmt.Errorf("error while insert to the btree %w", err)
 	}
 	pointers := coreAlgo.NewQueue()
-	RootNode.traverse(&pointers)
-	fmt.Println()
+	result := make([][][]uint64, 0)
+	t := make([][]uint64, 0, 1)
+	t = append(t, RootNode.traverse(&pointers))
+	result = append(result, t)
+
+	// fmt.Println()
 	popcounter := len(pointers)
+	temp := make([][]uint64, 0)
 	for !pointers.IsEmpty() {
 		if popcounter == 0 {
 			popcounter = len(pointers)
-			fmt.Println()
+			result = append(result, temp[:])
+			fmt.Println("temp is ", temp)
+			temp = make([][]uint64, 0)
+
 		}
 		pointToPage := pointers.Pop()
 		popcounter--
 		// fmt.Println("page number is ", *&pointers)
+
 		page, err := GetPage(uint(pointToPage))
 		if err != nil {
-			fmt.Errorf("%w ", err)
+			return nil, fmt.Errorf("%w ", err)
 		}
-		page.traverse(&pointers)
+		temp = append(temp, page.traverse(&pointers))
 	}
-	fmt.Println()
+	result = append(result, temp)
+	// fmt.Println()
+	// fmt.Println("the main result is ", result)
 
 	// make temp queue function
 
-	return nil
+	return &result, nil
 
 }
 
 // FIXME: should make it btree traverse  but for now it's ok
-func (node *PageHeader) traverse(pointers *coreAlgo.Queue) {
+func (node *PageHeader) traverse(pointers *coreAlgo.Queue) []uint64 {
 	keys := make([]uint64, 0)
 	for _, val := range node.GetSlots() {
 		cell := node.GetCellByOffset(val)
@@ -348,9 +368,10 @@ func (node *PageHeader) traverse(pointers *coreAlgo.Queue) {
 		}
 		keys = append(keys, res)
 	}
-	fmt.Print(keys)
+	// fmt.Print(keys)
 	if node.rightPointer != 0 {
 		pointers.Push(node.rightPointer)
 	}
+	return keys
 
 }
