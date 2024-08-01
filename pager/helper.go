@@ -246,6 +246,11 @@ func (page *PageHeader) SlotArray() map[uint16]PointerList {
 }
 
 func (page *PageHeader) GetSlots() []uint16 {
+	if page.pageId != uint16(BufData.pageNum) {
+		newpage, _ := GetPage(uint(page.pageId))
+		return newpage.GetSlots()
+	}
+
 	startidx := PAGEHEAD_SIZE
 	slots := make([]uint16, 0)
 	for i := startidx; i < uint(page.freeStart); {
@@ -325,10 +330,33 @@ func (node *PageHeader) UpdateLeftPointer(newLoc uint, cell *Cell) {
 	newcell.deserializeCell(BufData.Data[cellLocation-uint16(no) : cellLocation])
 	// fmt.Printf("%+v left pointer is updated ", newcell)
 }
-func (page *PageHeader) UpdateRightPointer(newLoc uint) {
-	page.rightPointer = uint16(newLoc)
-	page.UpdatePageHeader()
+func (page *PageHeader) UpdateRightPointer(newLoc uint, newpage *PageHeader) error {
+	newpage.rightPointer = page.rightPointer
+	newpage.UpdatePageHeader()
+	if newLoc != 0 {
+		LoadPage(uint(page.pageId))
+		page.rightPointer = uint16(newLoc)
+		page.UpdatePageHeader()
 
+	}
+	// if page.rightPointer != 0 {
+	// 	// go the rightPointer
+	// 	rightPage, err := GetPage(uint(page.rightPointer))
+	// 	if err != nil {
+	// 		return fmt.Errorf("error while updating the right pointer..  %w", err)
+	// 	}
+	// 	return rightPage.UpdateRightPointer(newLoc)
+	// }
+	// page.rightPointer = uint16(newLoc)
+	// fmt.Println("updating the right pointer ", page.GetKeys())
+	// if newLoc != 0 {
+	// 	newpage, _ := GetPage(newLoc)
+	// 	LoadPage(newLoc)
+	// 	fmt.Println("updating the right pointer ", newpage.GetKeys())
+
+	// }
+
+	return nil
 }
 
 // TODO: Update the right Pointer

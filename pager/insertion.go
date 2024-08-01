@@ -1,6 +1,7 @@
 package pager
 
 import (
+	coreAlgo "blackdb/core_algo"
 	Init "blackdb/init"
 	"encoding/binary"
 	"fmt"
@@ -28,6 +29,9 @@ const (
 )
 
 func (page *PageHeader) InsertNonfull(key uint64) (*PageHeader, error) {
+	if BufData.pageNum != uint(page.pageId) {
+		GetPage(uint(page.pageId))
+	}
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf[0:], key)
 	if page.pageType == LEAF || page.pageType == ROOT_AND_LEAF {
@@ -98,7 +102,7 @@ func (node *PageHeader) Insert(val uint64) (*PageHeader, error) {
 		// FIXME: error statement here
 		node.AddCell(buf)
 
-	} else if node.numSlots == NODEFULL {
+	} else if node.numSlots == NODEFULL && (node.pageType == ROOTPAGE || node.pageType == ROOT_AND_LEAF) {
 		// TODO: split pages for it
 		fmt.Println("node is full ")
 		root, err := node.SplitRootPages()
@@ -157,6 +161,10 @@ func (childPage *PageHeader) SplitPagesRightAndInsert(node *PageHeader, key uint
 	childPage.StartRangeRemoveSlots(Degree-1, uint(childPage.numSlots))
 	node.Insertkey(splitVal, childPage.pageId)
 	node.rightPointer = newPage.pageId
+	newPage.rightPointer = childPage.rightPointer
+	childPage.rightPointer = 0
+	childPage.UpdatePageHeader()
+	newPage.UpdatePageHeader()
 	node.UpdatePageHeader()
 	return nil, nil
 }
@@ -164,10 +172,6 @@ func (childPage *PageHeader) SplitPagesRightAndInsert(node *PageHeader, key uint
 // --------
 
 func (node *PageHeader) SplitPagesLeft(index int, splitpage uint16) (*PageHeader, error) {
-	leftcell, err := node.GetCell(uint(index))
-	if err != nil {
-		return nil, err
-	}
 	childPage, err := GetPage(uint(splitpage))
 	if err != nil {
 		return nil, err
@@ -200,26 +204,60 @@ func (node *PageHeader) SplitPagesLeft(index int, splitpage uint16) (*PageHeader
 	}
 	childPage.EndRangeRemoveSlots(0, Degree)
 	node.Insertkey(uint64(splitVal), newPage.pageId)
-	newPage.UpdateLeftPointer(uint(newPage.pageId), &leftcell)
 	return nil, nil
 }
 
 func (node *PageHeader) SplitRootPages() (*PageHeader, error) {
 	defer node.UpdatePageHeader()
-	keys := node.GetKeys()
-	splitVal := keys[(Degree - 1)]
-	if node.pageType == ROOT_AND_LEAF {
-		newPage, err := MakePage(LEAF, uint16(Init.TOTAL_PAGES))
+	// get the splitval with its left pointer
+	if node.pageType == ROOT_AND_LEAF || node.pageType == ROOTPAGE {
+
+		// can make it static type slice
+		keys := make([]NodeComponent, 0)
+		splitVal := node.GetKeys()[Degree-1]
+		splitcell, err := node.GetCell(Degree - 1)
+		splitLeftkey := splitcell.header.leftChild
+		var ptype PageType
+		if splitLeftkey == 0 {
+			ptype = LEAF
+
+		} else {
+			ptype = INTERIOR
+		}
+
 		if err != nil {
 			return nil, err
 		}
-		for i := (Degree); i < len(keys); i++ {
-			resp := make([]byte, 8)
-			binary.BigEndian.PutUint64(resp, keys[i])
-			newPage.AddCell(resp)
+		newPage, err := MakePage(ptype, uint16(Init.TOTAL_PAGES))
+		if err != nil {
+			return nil, err
 		}
-		LoadPage(1)
+
+		for _, val := range node.GetSlots()[Degree:] {
+			cell := node.GetCellByOffset(val)
+			keys = append(keys, NodeComponent{key: cell.cellContent, LeftPointer: cell.header.leftChild})
+
+		}
+		fmt.Println("keys are ", keys)
+		for _, v := range keys {
+			newPage.AddCell(v.key, AddCellOptions{LeftPointer: &v.LeftPointer})
+		}
+		// traverse to the leaf using its rightPointer only and append it there
+		// TODO: make a seperate such function
+
+		// for i := (Degree); i < len(keys); i++ {
+		// 	resp := make([]byte, 8)
+		// 	binary.BigEndian.PutUint64(resp, keys[i])
+		// 	// here adding the keys with its leftPointer
+		// 	newPage.AddCell(resp)
+		// }
+		// FIXME: this is actually end remove
 		node.StartRangeRemoveSlots(Degree-1, uint(node.numSlots))
+
+		node.UpdateRightPointer(uint(splitLeftkey), newPage)
+		// nodecell, _ := node.GetCell(3)
+		newp, _ := GetPage(6)
+		fmt.Printf("split page is %+v\n", newp.GetKeys())
 		// BUG: might be some bug here
 		rootpage, err := MakePage(ROOTPAGE, uint16(Init.TOTAL_PAGES))
 		if err != nil {
@@ -229,10 +267,15 @@ func (node *PageHeader) SplitRootPages() (*PageHeader, error) {
 		binary.BigEndian.PutUint64(res, uint64(splitVal))
 		// TODO: add the old page as the left pointer and right pointer as the newpage
 		node.pageType = LEAF
+		if splitLeftkey != 0 {
+			node.pageType = INTERIOR
+		}
 		if err := rootpage.AddCell(res, AddCellOptions{LeftPointer: &node.pageId}); err != nil {
 			return nil, err
 		}
 		rootpage.rightPointer = newPage.pageId
+		// update the rootvalue
+		Init.ROOTPAGE = int(rootpage.pageId)
 		rootpage.UpdatePageHeader()
 		return rootpage, nil
 
@@ -246,6 +289,9 @@ func (node *PageHeader) SplitRootPages() (*PageHeader, error) {
 func (page *PageHeader) Insertkey(key uint64, leftchild uint16) (*PageHeader, error) {
 	defer page.UpdatePageHeader()
 	buf := make([]byte, 8)
+	if BufData.pageNum != uint(page.pageId) {
+		GetPage(uint(page.pageId))
+	}
 	binary.BigEndian.PutUint64(buf[0:], key)
 	for i, val := range page.GetSlots() {
 		cell := page.GetCellByOffset(val)
@@ -256,4 +302,55 @@ func (page *PageHeader) Insertkey(key uint64, leftchild uint16) (*PageHeader, er
 	}
 	page.AddCell(buf, AddCellOptions{LeftPointer: &leftchild})
 	return nil, nil
+}
+
+func BtreeTraversal() error {
+	RootNode, err := GetPage(uint(Init.ROOTPAGE))
+	if err != nil {
+		return fmt.Errorf("error while insert to the btree %w", err)
+	}
+	pointers := coreAlgo.NewQueue()
+	RootNode.traverse(&pointers)
+	fmt.Println()
+	popcounter := len(pointers)
+	for !pointers.IsEmpty() {
+		if popcounter == 0 {
+			popcounter = len(pointers)
+			fmt.Println()
+		}
+		pointToPage := pointers.Pop()
+		popcounter--
+		// fmt.Println("page number is ", *&pointers)
+		page, err := GetPage(uint(pointToPage))
+		if err != nil {
+			fmt.Errorf("%w ", err)
+		}
+		page.traverse(&pointers)
+	}
+	fmt.Println()
+
+	// make temp queue function
+
+	return nil
+
+}
+
+// FIXME: should make it btree traverse  but for now it's ok
+func (node *PageHeader) traverse(pointers *coreAlgo.Queue) {
+	keys := make([]uint64, 0)
+	for _, val := range node.GetSlots() {
+		cell := node.GetCellByOffset(val)
+		res := binary.BigEndian.Uint64(cell.cellContent)
+		leftChild := cell.header.leftChild
+		if leftChild != 0 {
+
+			pointers.Push(leftChild)
+		}
+		keys = append(keys, res)
+	}
+	fmt.Print(keys)
+	if node.rightPointer != 0 {
+		pointers.Push(node.rightPointer)
+	}
+
 }
