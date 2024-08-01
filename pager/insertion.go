@@ -132,7 +132,14 @@ func (node *PageHeader) Insert(val uint64) (*PageHeader, error) {
 
 func (childPage *PageHeader) SplitPagesRightAndInsert(node *PageHeader, key uint64) (*PageHeader, error) {
 	defer childPage.UpdatePageHeader()
-	splitVal := childPage.GetKeys()[Degree-1]
+	// splitVal := childPage.GetKeys()[Degree-1]
+	splitcell, err := childPage.GetCell(uint(Degree - 1))
+	if err != nil {
+		return nil, err
+	}
+
+	splitVal := binary.BigEndian.Uint64(splitcell.cellContent)
+	splitleftKey := splitcell.header.leftChild
 	keyPairs := make([]NodeComponent, 0)
 
 	for _, v := range childPage.GetSlots()[Degree:childPage.numSlots] {
@@ -162,7 +169,7 @@ func (childPage *PageHeader) SplitPagesRightAndInsert(node *PageHeader, key uint
 	node.Insertkey(splitVal, childPage.pageId)
 	node.rightPointer = newPage.pageId
 	newPage.rightPointer = childPage.rightPointer
-	childPage.rightPointer = 0
+	childPage.rightPointer = splitleftKey
 	childPage.UpdatePageHeader()
 	newPage.UpdatePageHeader()
 	node.UpdatePageHeader()
@@ -323,8 +330,9 @@ func BtreeTraversal() (*[][][]uint64, error) {
 	t := make([][]uint64, 0, 1)
 	t = append(t, RootNode.traverse(&pointers))
 	result = append(result, t)
+	fmt.Println()
 
-	// fmt.Println()
+	fmt.Println("traver", t)
 	popcounter := len(pointers)
 	temp := make([][]uint64, 0)
 	for !pointers.IsEmpty() {
@@ -333,6 +341,7 @@ func BtreeTraversal() (*[][][]uint64, error) {
 			result = append(result, temp[:])
 			fmt.Println("temp is ", temp)
 			temp = make([][]uint64, 0)
+			fmt.Println()
 
 		}
 		pointToPage := pointers.Pop()
@@ -346,7 +355,7 @@ func BtreeTraversal() (*[][][]uint64, error) {
 		temp = append(temp, page.traverse(&pointers))
 	}
 	result = append(result, temp)
-	// fmt.Println()
+	fmt.Println()
 	// fmt.Println("the main result is ", result)
 
 	// make temp queue function
@@ -368,7 +377,7 @@ func (node *PageHeader) traverse(pointers *coreAlgo.Queue) []uint64 {
 		}
 		keys = append(keys, res)
 	}
-	// fmt.Print(keys)
+	fmt.Print(keys)
 	if node.rightPointer != 0 {
 		pointers.Push(node.rightPointer)
 	}

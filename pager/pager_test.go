@@ -30,7 +30,7 @@ func TestInsert(t *testing.T) {
 	if err != nil {
 		fmt.Println("error making page ", err)
 	}
-	for i := 0; i <= 1000; i-- {
+	for i := 0; i <= 10000; i++ {
 		// randval := uint64(rand.Int63n(10000))
 
 		r.Insert(uint64(i))
