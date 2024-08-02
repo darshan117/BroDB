@@ -11,14 +11,14 @@ const (
 
 type PageHeader struct {
 	// FIXME: might need to remove the pageId
-	pageId         uint16
-	pageType       PageType
+	PageId         uint16
+	PageType       PageType
 	freeStart      uint16
 	freeEnd        uint16
 	totalFree      uint16
-	numSlots       uint16
+	NumSlots       uint16
 	lastOffsetUsed uint16
-	rightPointer   uint16
+	RightPointer   uint16
 	flags          uint8
 }
 type OverflowPageHeader struct {
@@ -35,11 +35,11 @@ type CellHeader struct {
 	cellSize   uint16
 	isOverflow bool
 	// TODO: implement the leftmost child pointer for the given key
-	leftChild uint16
+	LeftChild uint16
 }
 type Cell struct {
-	header      CellHeader
-	cellContent []byte
+	Header      CellHeader
+	CellContent []byte
 }
 type AddCellOptions struct {
 	Index       *int
@@ -54,6 +54,6 @@ type PointerList struct {
 
 type BufPage struct {
 	Data    []byte
-	pageNum uint
+	PageNum uint
 	// more can be added here
 }
