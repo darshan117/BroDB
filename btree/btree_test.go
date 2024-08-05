@@ -28,7 +28,7 @@ func Initialize() {
 }
 
 func TestInsert(t *testing.T) {
-	// t.Skip()
+	t.Skip()
 	Initialize()
 	Init.Init()
 	pager.MakePageZero(22, 1)
@@ -57,7 +57,7 @@ func TestInsert(t *testing.T) {
 	}
 }
 func TestSearch(t *testing.T) {
-	// t.Skip()
+	t.Skip()
 	tree := btree.NewBtree(5)
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
@@ -90,38 +90,58 @@ func TestSearch(t *testing.T) {
 }
 
 func TestParent(t *testing.T) {
-	// Initialize()
+	// t.Skip()
+	Initialize()
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
 		log.Fatal(err)
 	}
 	// rand.Seed(500)
-	for i := 0; i <= 1000; i += 2 {
+	for i := 0; i <= 200; i += 2 {
 		// randval := uint64(rand.Int63n(100))
 		rnode.Insert(uint64(i))
+		btree.BtreeTraversal()
 	}
-	rnode.Insert(uint64(41))
-	rnode.Insert(uint64(43))
-	rnode.Insert(uint64(45))
 	disktree, err := btree.BtreeTraversal()
 	if err != nil {
 		t.Error(err)
 	}
 	fmt.Printf("%+v\n", disktree)
-	val := uint64(50)
-	slot, id, err := btree.GetParent(val)
-	if err != nil {
-		t.Error(err)
-	}
-	newpage, _ := pager.GetPage(uint(*id))
-	cell, _ := newpage.GetCell(uint(*slot))
-	npage := btree.BtreePage{*newpage}
+	// rnode.Insert(uint64(21))
+	// rnode.Insert(uint64(22))
+	// rnode.Insert(uint64(23))
+	// rnode.Insert(uint64(19))
+	// rnode.Insert(uint64(17))
+	// rnode.Insert(uint64(25))
+	// btree.BtreeTraversal()
+	// rnode.Insert(uint64(7))
+	// rnode.Insert(uint64(3))
+	// rnode.Insert(uint64(11))
+	// slot, id, err := btree.GetParent(7)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// newpage, _ := pager.GetPage(uint(*id))
+	// cell, _ := newpage.GetCell(uint(*slot))
+	// npage := btree.BtreePage{*newpage}
+	// leftsibl, _ := btree.RightSiblingCount(7)
+	// fmt.Printf("npage are %+v and the parent is %d\n", npage.GetKeys(), binary.BigEndian.Uint64(cell.CellContent))
+	// fmt.Printf("left sibling is %+v\n", leftsibl.GetKeys())
+	// val := uint64(50)
 
-	leftSibling, err := btree.LeftSiblingCount(val)
+	// rightsib, err := btree.RightSiblingCount(15)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// // rightsib := btree.BtreePage{*rightSibling}
+	// rightsib.Shuffle()
+	disktree, err = btree.BtreeTraversal()
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Printf("leftsibling count is %d pageid is %+v  cell is %+v", leftSibling.GetKeys(), npage, cell)
+	// fmt.Printf("%+v\n", disktree)
+
+	// fmt.Printf("leftsibling count is %d pageid is %+v  cell is %+v", leftSibling.GetKeys(), npage, cell)
 
 }
 
