@@ -97,7 +97,7 @@ func TestParent(t *testing.T) {
 		log.Fatal(err)
 	}
 	// rand.Seed(500)
-	for i := 0; i <= 200; i += 2 {
+	for i := 0; i <= 40; i += 2 {
 		// randval := uint64(rand.Int63n(100))
 		rnode.Insert(uint64(i))
 		btree.BtreeTraversal()
@@ -107,16 +107,24 @@ func TestParent(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Printf("%+v\n", disktree)
-	// rnode.Insert(uint64(21))
-	// rnode.Insert(uint64(22))
-	// rnode.Insert(uint64(23))
-	// rnode.Insert(uint64(19))
-	// rnode.Insert(uint64(17))
-	// rnode.Insert(uint64(25))
-	// btree.BtreeTraversal()
-	// rnode.Insert(uint64(7))
-	// rnode.Insert(uint64(3))
+	rnode.Insert(uint64(1))
+	rnode.Insert(uint64(3))
+	rnode.Insert(uint64(5))
+	rnode.Insert(uint64(23))
+	rnode.Insert(uint64(9))
 	// rnode.Insert(uint64(11))
+	// rnode.Insert(uint64(13))
+	rnode.Insert(uint64(25))
+	rnode.Insert(uint64(27))
+	// btree.BtreeTraversal()
+	rnode.Insert(uint64(7))
+	// rnode.Insert(uint64(3))
+	rnode.Insert(uint64(11))
+	for i := 40; i <= 50; i++ {
+		// randval := uint64(rand.Int63n(100))
+		rnode.Insert(uint64(i))
+		btree.BtreeTraversal()
+	}
 	// slot, id, err := btree.GetParent(7)
 	// if err != nil {
 	// 	t.Error(err)

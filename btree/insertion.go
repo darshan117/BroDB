@@ -61,8 +61,9 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 					return page.InsertNonfull(key)
 				} else if leftcell.Header.LeftChild != uint16(0) {
 					page = &BtreePage{*childPage}
+					page.InsertNonfull(key)
 					page.Shuffle()
-					return page.InsertNonfull(key)
+					return nil, nil
 				}
 			}
 		}
