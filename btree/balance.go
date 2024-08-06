@@ -90,15 +90,19 @@ func (nodePage *BtreePage) Shuffle() {
 			leftsib.AddCell(v.key, pager.AddCellOptions{LeftPointer: &v.LeftPointer})
 		}
 	} else {
-		// leftsib.RemoveRange(uint(midPoint), uint(leftsib.NumSlots))
+		leftsib.RemoveRange(uint(midPoint), uint(leftsib.NumSlots))
 		// TODO: need new function for insert with left Pointer
-		// rightsib.InsertNonfull(binary.BigEndian.Uint64(parentcell.CellContent)) //, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
+		rightsib.Insertkey(binary.BigEndian.Uint64(parentcell.CellContent), leftsib.RightPointer) //, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
+
 		// pager.LoadPage(uint(parent.PageId))
-		// parentcell.ReplaceCell(binary.BigEndian.Uint64(midkey.key), parentcell.Header.LeftChild)
-		// for _, v := range allKeys[midPoint-int(keysToBeAdjusted)+1 : midPoint] {
-		// fmt.Printf("all keys %+v\n mid key is \n", v)
-		// rightsib.AddCell(v.key, pager.AddCellOptions{LeftPointer: &v.LeftPointer})
-		// }
+		parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(midkey.key), parentcell.Header.LeftChild)
+		leftsib.RightPointer = midkey.LeftPointer
+		leftsib.UpdatePageHeader()
+		for _, v := range allKeys[midPoint-int(keysToBeAdjusted) : midPoint-1] {
+			fmt.Printf("all keys %+v\n mid key is %v\n", v, allKeys[midPoint])
+			rightsib.Insertkey(binary.BigEndian.Uint64(v.key), v.LeftPointer)
+			// rightsib.AddCell(v.key, pager.AddCellOptions{LeftPointer: &v.LeftPointer})
+		}
 		//
 		// left redistribution
 	}
@@ -236,7 +240,7 @@ func (node *BtreePage) RightSiblingCount() (*BtreePage, error) {
 		// fmt.Println(parentPage)
 		return nil, err
 	}
-	if *parentslot < parentPage.NumSlots-1 && *parentslot > 0 {
+	if *parentslot < parentPage.NumSlots-1 {
 		// FIXME: why parentslot+1
 		parentCell, err := parentPage.GetCell(uint(*parentslot) + 1)
 		if err != nil {
