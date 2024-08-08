@@ -133,6 +133,11 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 
 func (page *PageHeader) RemoveCell(idx uint) error {
 	defer page.UpdatePageHeader()
+	if page.PageId != uint16(BufData.PageNum) {
+		// FIXME: do error handling here
+		newPage, _ := GetPage(uint(page.PageId))
+		return newPage.RemoveCell(idx)
+	}
 	// do a page load here
 	if idx > uint(page.NumSlots)-1 {
 		return fmt.Errorf("error while removing cell | index is greater than the max slots... ")
@@ -149,12 +154,16 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 }
 
 // new implementaton
+// TODO: replace the fucking cell
 
 func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 	if page.PageId != uint16(BufData.PageNum) {
 		// FIXME: do error handling here
 		newPage, _ := GetPage(uint(page.PageId))
 		return newPage.GetCell(idx)
+	}
+	if page.NumSlots <= uint16(idx) {
+		return Cell{}, fmt.Errorf("index not found in the page")
 	}
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	offset := BufData.Data[slotIndex : slotIndex+2]
@@ -183,6 +192,7 @@ func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 }
 
 func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
+	LoadPage(uint(page.PageId))
 	var cell Cell
 	cellHeaderSize := CELL_HEAD_SIZE
 	cell.deserializeCell(BufData.Data[offset : offset+uint16(cellHeaderSize)+1])

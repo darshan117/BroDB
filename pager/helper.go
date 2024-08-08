@@ -63,6 +63,21 @@ func (page *PageHeader) UpdatePageHeader() {
 
 }
 
+func (page *PageHeader) ReplaceCell(cell *Cell, key uint64, leftPointer uint16) {
+	if page.PageId != uint16(BufData.PageNum) {
+		LoadPage(uint(page.PageId))
+	}
+	// load page while replacing cell
+	res := make([]byte, 8)
+	binary.BigEndian.PutUint64(res[0:], key)
+	cell.CellContent = res
+	cell.Header.LeftChild = leftPointer
+	cellLocation := cell.Header.cellLoc
+	cellSer, n := cell.Header.serializeCell(cell.CellContent)
+	copy(BufData.Data[cellLocation-uint16(n):cellLocation], cellSer.Bytes())
+
+}
+
 func IncrementTotalPages() error {
 	buff := make([]byte, 4)
 	binary.BigEndian.PutUint32(buff, uint32(Init.TOTAL_PAGES+1))
@@ -110,13 +125,26 @@ func LoadPage(pageNo uint) error {
 	}
 	offset := BufData.PageNum * uint(Init.PAGE_SIZE)
 	mapSize := func() uint {
-		if offset+uint(Init.PAGE_SIZE) > uint(fileStat.Size()) {
-			return uint(fileStat.Size()) - offset
+		fileSize := uint(fileStat.Size())
+		if offset >= fileSize {
+			return 0 // Or handle this error case appropriately
+		}
+		remainingSize := fileSize - offset
+		if remainingSize < uint(Init.PAGE_SIZE) {
+			return uint(remainingSize)
 		}
 		return uint(Init.PAGE_SIZE)
+		// if offset > uint(fileStat.Size()) {
+		// 	fmt.Println("offset is ", offset)
+		// 	return uint(fileStat.Size()) - offset
+		// }
+		// return uint(Init.PAGE_SIZE)
 	}
 	BufData.Data, err = syscall.Mmap(int(Init.Dbfile.Fd()), int64(offset), int(mapSize()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
+		fmt.Println("map size is ", mapSize())
+		// syscall.Munmap(BufData.Data)
+		// return LoadPage(pageNo)
 		return fmt.Errorf("error is %w", err)
 	}
 	BufData.PageNum = pageNo
@@ -146,8 +174,45 @@ func (page *PageHeader) InsertSlot(idx int, offsetVal uint16) {
 
 }
 
+func (page *PageHeader) RemoveRange(start, end uint) error {
+	if page.PageId != uint16(BufData.PageNum) {
+		if err := LoadPage(uint(page.PageId)); err != nil {
+			return err
+		}
+	}
+
+	startIndex := PAGEHEAD_SIZE + start*2
+	endIndex := PAGEHEAD_SIZE + end*2
+	// remainingBytes := page.freeStart - uint16(endIndex)
+	for i := start; i < end; i++ {
+		oldCell, err := page.GetCell(i)
+		if err != nil {
+			return err
+		}
+		page.totalFree += oldCell.Header.cellSize
+		page.totalFree += uint16(CELL_HEAD_SIZE)
+		page.totalFree += 2 // slot size has
+		// page.freeStart += 2
+	}
+
+	// fmt.Println("before", BufData.Data[:40])
+	// Move the remaining data to fill the gap
+	copy(BufData.Data[startIndex:], BufData.Data[endIndex:page.freeStart])
+
+	// Zero out the now-unused space at the end
+	for i := page.freeStart - uint16(endIndex-startIndex); i < page.freeStart; i++ {
+		BufData.Data[i] = 0
+	}
+
+	// Update freeStart
+	page.freeStart -= uint16(endIndex - startIndex)
+	page.NumSlots -= uint16(end - start)
+	page.UpdatePageHeader()
+	return nil
+}
+
 // TODO: range remove slots
-func (page *PageHeader) EndRangeRemoveSlots(start uint, end uint) {
+func (page *PageHeader) StartRangeRemoveSlots(start uint, end uint) {
 	defer page.UpdatePageHeader()
 	// shiftslots starting from   start index
 	freeSpace := uint16(0)
@@ -166,7 +231,7 @@ func (page *PageHeader) EndRangeRemoveSlots(start uint, end uint) {
 	page.freeStart -= freestart
 
 }
-func (page *PageHeader) StartRangeRemoveSlots(start uint, end uint) {
+func (page *PageHeader) EndRangeRemoveSlots(start uint, end uint) {
 	// shiftslots starting from   start index
 	if page.PageId != uint16(BufData.PageNum) {
 		LoadPage(uint(page.PageId))
@@ -246,13 +311,23 @@ func (page *PageHeader) SlotArray() map[uint16]PointerList {
 }
 
 func (page *PageHeader) GetSlots() []uint16 {
-	if page.PageId != uint16(BufData.PageNum) {
-		newpage, _ := GetPage(uint(page.PageId))
-		return newpage.GetSlots()
-	}
+	// if page.PageId != uint16(BufData.PageNum) {
+	// 	newpage, _ := GetPage(uint(page.PageId))
+	// 	return newpage.GetSlots()
+	// }
+	LoadPage(uint(page.PageId))
 
 	startidx := PAGEHEAD_SIZE
 	slots := make([]uint16, 0)
+	if len(BufData.Data) == 0 {
+		fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
+		if err := LoadPage(uint(page.PageId)); err != nil {
+			fmt.Println(err)
+
+		}
+		fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
+		return slots
+	}
 	for i := startidx; i < uint(page.freeStart); {
 		offset := BufData.Data[i : i+2]
 		offsetVal := binary.BigEndian.Uint16(offset)

@@ -5,6 +5,7 @@ import (
 	Init "blackdb/init"
 	"blackdb/pager"
 	"log"
+	"runtime"
 
 	"fmt"
 	"reflect"
@@ -97,11 +98,17 @@ func TestParent(t *testing.T) {
 		log.Fatal(err)
 	}
 	// rand.Seed(500)
-	for i := 100; i > 0; i -= 2 {
+	for i := 1000; i > 0; i -= 2 {
 		// randval := uint64(rand.Int63n(100))
 		rnode.Insert(uint64(i))
-		btree.BtreeTraversal()
+		runtime.GC()
+		// btree.BtreeTraversal()
 	}
+	// for i := 1000; i < 10000; i++ {
+	// 	// randval := uint64(rand.Int63n(100))
+	// 	rnode.Insert(uint64(i))
+	// 	// btree.BtreeTraversal()
+	// }
 	disktree, err := btree.BtreeTraversal()
 	if err != nil {
 		t.Error(err)

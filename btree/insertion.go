@@ -61,9 +61,10 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 					return page.InsertNonfull(key)
 				} else if leftcell.Header.LeftChild != uint16(0) {
 					page = &BtreePage{*childPage}
-					page.InsertNonfull(key)
+
 					page.Shuffle()
-					return nil, nil
+					// fmt.Printf("key is %d %+v \n", key, page.GetKeys())
+					return page.InsertNonfull(key)
 				}
 			}
 		}
@@ -321,6 +322,7 @@ func (page *BtreePage) Insertkey(key uint64, LeftChild uint16) (*BtreePage, erro
 	return nil, nil
 }
 
+// BUG: this thing is storing stuff in the [] which is getting lots of memory
 func BtreeTraversal() (*[][][]uint64, error) {
 	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
 	if err != nil {

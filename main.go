@@ -1,9 +1,9 @@
 package main
 
 import (
+	"blackdb/btree"
 	Init "blackdb/init"
 	"blackdb/pager"
-	"blackdb/pager/btree"
 	"fmt"
 	"os"
 	"syscall"
@@ -24,13 +24,13 @@ func init() {
 
 func main() {
 	// make the rootpage
-	rootpage, err := pager.MakePage(pager.ROOT_AND_LEAF, 1)
-	if err != nil {
-		fmt.Println("error making page ", err)
-	}
 	// btree := pager.NewBtree()
+	rpage, err := btree.NewBtreePage()
+	if err != nil {
+		return
+	}
 	keys := make([]uint64, 0)
-	for i := 1; i <= 30; i++ {
+	for i := 1; i <= 10000; i++ {
 		// keys := []uint64{32, 24, 12, 30, 66, 88, 77, 50, 10, 33, 35, 42, 36, 37, 25, 26, 27, 19, 22, 21, 23, 1, 2, 3, 4, 87, 38, 39, 40, 45, 44,
 		// 	90, 91, 92, 93, 94, 95, 96}
 
@@ -38,11 +38,18 @@ func main() {
 		keys = append(keys, uint64(i))
 
 	}
-	rpage := btree.BtreePage{*rootpage}
 	for _, v := range keys {
 		rpage.Insert(v)
 	}
-	btree.BtreeTraversal()
+	// btree.BtreeTraversal()
+	// _, id, err := btree.Search(55)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// fmt.Println("search gave the id ", id)
+	// pagid, _ := pager.GetPage(uint(id))
+	// fmt.Println(pagid.GetKeys())
 
 	// rootpag, _ := pager.GetPage(1)
 	// newPage, _ := pager.GetPage(2)

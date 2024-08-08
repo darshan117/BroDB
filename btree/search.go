@@ -41,7 +41,7 @@ func (tree *BtreePage) search(key uint64) (uint16, uint16, error) {
 }
 
 // can make it pointer to the uint16
-func Search(key uint64) (uint16, uint16, error) {
+func Search(key uint64) (slot uint16, pageid uint16, err error) {
 	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
 	if err != nil {
 		return 0, 0, fmt.Errorf("error while insert to the btree %w", err)
