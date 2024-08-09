@@ -14,7 +14,7 @@ type NodeComponent struct {
 }
 
 const (
-	Degree    = 5
+	Degree    = 3
 	MaxChild  = 2 * Degree
 	UNDERFLOW = int(Degree / 2)
 	NODEFULL  = 2*Degree - 1

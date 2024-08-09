@@ -322,6 +322,10 @@ func (page *BtreePage) Insertkey(key uint64, LeftChild uint16) (*BtreePage, erro
 	return nil, nil
 }
 
+func DFSTraversal() {
+
+}
+
 // BUG: this thing is storing stuff in the [] which is getting lots of memory
 func BtreeTraversal() (*[][][]uint64, error) {
 	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
