@@ -134,9 +134,9 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 func (page *PageHeader) RemoveCell(idx uint) error {
 	defer page.UpdatePageHeader()
 	if page.PageId != uint16(BufData.PageNum) {
-		// FIXME: do error handling here
-		newPage, _ := GetPage(uint(page.PageId))
-		return newPage.RemoveCell(idx)
+		if err := LoadPage(uint(page.PageId)); err != nil {
+			return err
+		}
 	}
 	// do a page load here
 	if idx > uint(page.NumSlots)-1 {
@@ -146,10 +146,12 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 	oldCell, _ := page.GetCell(idx)
 	page.totalFree += oldCell.Header.cellSize
 	page.totalFree += uint16(CELL_HEAD_SIZE)
+	// BUG: there is bug while shifting slots
 	page.ShiftSlots(idx)
 	page.freeStart -= 2
 	page.NumSlots -= 1
 	page.totalFree += 2 // slot size has
+
 	return nil
 }
 

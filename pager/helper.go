@@ -152,6 +152,9 @@ func LoadPage(pageNo uint) error {
 }
 
 func (page *PageHeader) ShiftSlots(idx uint) {
+	if page.PageId != uint16(BufData.PageNum) {
+		LoadPage(BufData.PageNum)
+	}
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	for i := 0; i < int(page.NumSlots)-int(idx); i++ {
 		copy(BufData.Data[slotIndex:slotIndex+2], BufData.Data[slotIndex+2:slotIndex+4])
@@ -437,3 +440,20 @@ func (page *PageHeader) UpdateRightPointer(newLoc uint, newpage *PageHeader) err
 // TODO: Update the right Pointer
 // use the db.write for updating right pointer or update pageHeader() will work here
 // TODO: fixPointers Function as a wrapper for the updateleftPointer and updateRightPointer
+func (node *PageHeader) GetrightmostPage() (pageid *PageHeader, err error) {
+	if node.PageType == LEAF {
+		if node.RightPointer != 0 {
+			return nil, fmt.Errorf("some error in node rightpointer | got the rightpointer in the leaf node %d", node.RightPointer)
+		}
+
+		return node, nil
+	}
+
+	rightpage, err := GetPage(uint(node.RightPointer))
+	if err != nil {
+		return nil, err
+	}
+
+	return rightpage.GetrightmostPage()
+
+}
