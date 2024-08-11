@@ -11,6 +11,7 @@ type Queue []uint16
 
 // might add specified no of elements
 func NewQueue() Queue {
+
 	return make(Queue, 0)
 }
 

@@ -4,14 +4,12 @@ import (
 	"blackdb/btree"
 	Init "blackdb/init"
 	"blackdb/pager"
-	"log"
-	"runtime"
-
 	"fmt"
-	"reflect"
-	"testing"
-
+	"log"
 	"math/rand"
+	"reflect"
+	"runtime"
+	"testing"
 )
 
 // TODO: test adding multiple cells
@@ -154,7 +152,7 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i <= 200; i++ {
+	for i := 0; i <= 20; i++ {
 		rnode.Insert(uint64(i))
 	}
 	btree.BtreeTraversal()
@@ -172,10 +170,10 @@ func TestRemove(t *testing.T) {
 	fmt.Println("keys are ", rightrightpage.GetKeys())
 
 	btree.Remove(105)
-	// btree.Remove(18)
+	btree.Remove(18)
 	// btree.Remove(28)
 	// btree.Remove(14)
-	// btree.Remove(22)
+	btree.Remove(22)
 	// btree.Remove(0)
 	// btree.Remove(10)
 	// btree.Remove(2)

@@ -2,6 +2,7 @@ package pager
 
 import (
 	Init "blackdb/init"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -12,6 +13,7 @@ var (
 	MINCELLSIZE    uint = 10
 	SLOT_SIZE      uint = 2
 	CELL_HEAD_SIZE uint = 7
+	FREEPAGE_SIZE  uint = 2
 )
 
 func MakePage(ptype PageType, id uint16) (*PageHeader, error) {
@@ -155,13 +157,12 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 	return nil
 }
 
-// new implementaton
-// TODO: replace the fucking cell
-
 func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 	if page.PageId != uint16(BufData.PageNum) {
-		// FIXME: do error handling here
-		newPage, _ := GetPage(uint(page.PageId))
+		newPage, err := GetPage(uint(page.PageId))
+		if err != nil {
+			return Cell{}, err
+		}
 		return newPage.GetCell(idx)
 	}
 	if page.NumSlots <= uint16(idx) {
@@ -321,4 +322,53 @@ func (ovHeader *OverflowPageHeader) ReadOverflowPage(pageNo uint) ([]byte, error
 	}
 	return contents, nil
 
+}
+
+func MakeFreelistPage(pageNo uint16) error {
+	var freelist FreelistPage
+	freelist.TotalPages = 1
+	freelist.NextPage = 0
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint16(freelist.NextPage))
+	binary.Write(&buf, binary.BigEndian, uint16(freelist.TotalPages))
+	// append to freelistPage
+	freelist.AppendFreePage(pageNo)
+	Init.UpdateFreelist(uint(pageNo))
+
+	return nil
+}
+
+// might be a helper function
+func (freepage *FreelistPage) AppendFreePage(pageNo uint16) error {
+
+	if freepage.NextPage != 0 {
+		nextpage, err := FreePageLoad(freepage.NextPage)
+		if err != nil {
+			return err
+		}
+		return nextpage.AppendFreePage(pageNo)
+	}
+	// freepageheader has the size 4 bytes + i*2
+	if freepage.TotalPages < 1024 {
+		pointTo := FREEPAGE_SIZE + uint(pageNo)*2
+		binary.BigEndian.PutUint16(BufData.Data[pointTo:], pageNo)
+		Init.UpdateFreelistCount(uint(1))
+		return nil
+	}
+	// how
+	freepage.NextPage = pageNo
+	binary.BigEndian.PutUint16(BufData.Data[0:], pageNo)
+	MakeFreelistPage(pageNo)
+	return nil
+
+}
+
+func FreePageLoad(pageNo uint16) (*FreelistPage, error) {
+	if err := LoadPage(uint(pageNo)); err != nil {
+		return nil, err
+	}
+	var freelistpage FreelistPage
+	freelistpage.NextPage = binary.BigEndian.Uint16(BufData.Data[0:])
+	freelistpage.TotalPages = binary.BigEndian.Uint16(BufData.Data[2:])
+	return &freelistpage, nil
 }

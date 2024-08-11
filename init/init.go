@@ -13,6 +13,7 @@ var (
 )
 
 func Init() *os.File {
+
 	once.Do(func() {
 		dbname := os.Args[1]
 
@@ -37,6 +38,8 @@ var (
 	FILE_CH_COUNTER = 0
 	DATABASE_SIZE   = 1 // in pages
 	ROOTPAGE        = 1 // in pages
+	FREELIST_START  = 0
+	FREELIST_COUNT  = 0
 )
 
 // 							Database Header Format
@@ -75,7 +78,9 @@ func makeFileHeader(file *os.File) error {
 	binary.BigEndian.PutUint32(Header[18+4:], uint32(DATABASE_SIZE))   // database size in pages
 	binary.BigEndian.PutUint32(Header[22+4:], uint32(FILE_CH_COUNTER)) // pagenumber of largest root node btree page
 	binary.BigEndian.PutUint32(Header[26+4:], uint32(TOTAL_PAGES))     // Total number of pages
-	binary.BigEndian.PutUint32(Header[34:], uint32(ROOTPAGE))          // Total number of pages
+	binary.BigEndian.PutUint32(Header[34:], uint32(ROOTPAGE))          // Rootpage number
+	binary.BigEndian.PutUint32(Header[38:], uint32(FREELIST_START))    //  first freelist page
+	binary.BigEndian.PutUint32(Header[42:], uint32(FREELIST_COUNT))    // Total number of freelist pages
 	binary.BigEndian.PutUint16(Header[48:], uint16(8))                 // end delimiter
 	// can do add other header things if needed
 	err := binary.Write(file, binary.BigEndian, Header) // magic code Brodb
@@ -97,6 +102,30 @@ func UpdateRootPage(pageNo uint) error {
 		return fmt.Errorf("error changing the rootpage: %w", err)
 	}
 	ROOTPAGE = int(pageNo)
+	return nil
+
+}
+func UpdateFreelist(pageNo uint) error {
+	buff := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(buff, uint32(pageNo))
+	_, err := Dbfile.WriteAt(buff, 38) // 0 means relative to the origin of the file
+	if err != nil {
+		return fmt.Errorf("error changing the rootpage: %w", err)
+	}
+	FREELIST_START = int(pageNo)
+	return nil
+
+}
+func UpdateFreelistCount(count uint) error {
+	buff := make([]byte, 4)
+	FREELIST_COUNT += int(count)
+
+	binary.BigEndian.PutUint32(buff, uint32(FREELIST_COUNT))
+	_, err := Dbfile.WriteAt(buff, 42) // 0 means relative to the origin of the file
+	if err != nil {
+		return fmt.Errorf("error changing the rootpage: %w", err)
+	}
 	return nil
 
 }

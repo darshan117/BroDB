@@ -13,11 +13,6 @@ type RemoveOptions struct {
 func (node *BtreePage) remove(key uint64, slot uint) error {
 	// if the node is the leaf page then remove easyily
 	if node.PageType == pager.LEAF || node.PageType == pager.ROOT_AND_LEAF {
-		// if options == nil {
-		// 	return fmt.Errorf("no remove options were provided")
-
-		// }
-		// get the page
 		fmt.Println("removing the key ", key)
 		if err := node.RemoveCell(slot); err != nil {
 			return err
@@ -25,7 +20,7 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 		node.Shuffle()
 		return nil
 	} else if node.PageType == pager.INTERIOR || node.PageType == pager.ROOTPAGE {
-		// get node.leftchild could be a helper function
+		// TODO: get node.leftchild could be a helper function
 		keyCell, err := node.GetCell(slot)
 		if err != nil {
 			return err
@@ -36,6 +31,12 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 			return err
 		}
 		leftchildPage := BtreePage{*leftchild}
+		// if the left child page is not underflow
+		if leftchildPage.NumSlots <= uint16(UNDERFLOW) {
+		// node.shuffle or node . merge
+			return nil
+		}
+		// then get the right pointers leftmostpage() or directly shuffle with merging
 		pageid, err := leftchildPage.GetrightmostPage()
 		if err != nil {
 			return err

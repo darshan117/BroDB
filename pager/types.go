@@ -57,3 +57,9 @@ type BufPage struct {
 	PageNum uint
 	// more can be added here
 }
+
+// can make the freelist page here or can make the freelist page in the init flolder
+type FreelistPage struct {
+	NextPage   uint16
+	TotalPages uint16
+}

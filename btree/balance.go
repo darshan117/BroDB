@@ -131,7 +131,7 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	} else {
 		rightcount = int(rightsib.NumSlots)
 	}
-	if leftcount == 0 && rightcount == 0 {
+	if leftcount == 0 && node.isUnderFlow() || rightcount == 0 && node.isUnderFlow() {
 		return nil, nil, fmt.Errorf("both siblings are Underflow")
 	}
 
@@ -354,10 +354,8 @@ func (node *BtreePage) GetkeysWithPointer() []NodeComponent {
 
 }
 
-// 	slot, pageid, _ := node.search(key)
-// 	nodePage, _ := pager.GetPage(uint(pageid))
-// 	if nodePage.PageType == pager.LEAF {
+func (node *BtreePage) MergeNodes(withNode uint16) error {
+	// if the page is interior then first replace the node and then merge with the remaining and the shuffle
 
-// 	}
-
-// }
+	return nil
+}
