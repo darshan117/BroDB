@@ -152,12 +152,12 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i <= 20; i++ {
+	for i := 0; i <= 30; i++ {
 		rnode.Insert(uint64(i))
+		// btree.BtreeTraversal()
 	}
-	btree.BtreeTraversal()
 	// search 9 and get its right child
-	_, pageid, err := btree.Search(78)
+	_, pageid, err := btree.Search(31)
 	if err != nil {
 		t.Error(err)
 	}
@@ -168,12 +168,37 @@ func TestRemove(t *testing.T) {
 	rightpage, err := pager.GetPage(uint(newpage.RightPointer))
 	rightrightpage, err := pager.GetPage(uint(rightpage.RightPointer))
 	fmt.Println("keys are ", rightrightpage.GetKeys())
-
-	btree.Remove(105)
-	btree.Remove(18)
-	// btree.Remove(28)
-	// btree.Remove(14)
+	testkeys := make([]uint64, 0, 200)
+	for i := 0; i <= 30; i++ {
+		testkeys = append(testkeys, uint64(i))
+	}
+	btree.Remove(28)
+	btree.BtreeTraversal()
+	btree.Remove(21)
+	btree.BtreeTraversal()
 	btree.Remove(22)
+	btree.BtreeTraversal()
+	btree.Remove(20)
+	btree.BtreeTraversal()
+	btree.Remove(23)
+	btree.BtreeTraversal()
+	btree.Remove(18)
+	btree.BtreeTraversal()
+	btree.Remove(24)
+	// btree.Remove(24)
+	allkeys, err := btree.BtreeDFSTraversal()
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(allkeys, testkeys) {
+		t.Errorf(
+			`
+		expected:%v,
+		got:%v
+		`, testkeys, allkeys)
+	}
+
+	// btree.Remove(18)
 	// btree.Remove(0)
 	// btree.Remove(10)
 	// btree.Remove(2)

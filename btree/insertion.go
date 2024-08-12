@@ -81,9 +81,10 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 
 			}
 			page = &BtreePage{*rightChildPage}
+			page.InsertNonfull(key)
 			page.Shuffle()
 
-			return page.InsertNonfull(key)
+			return nil, nil
 		}
 	}
 	// BUG: check for if it has right pointer or else page.addcell
@@ -112,14 +113,12 @@ func (node *BtreePage) Insert(val uint64) (*BtreePage, error) {
 
 	} else if node.NumSlots == NODEFULL && (node.PageType == pager.ROOTPAGE || node.PageType == pager.ROOT_AND_LEAF) {
 		// TODO: split pages for it
-		fmt.Println("node is full ")
 		root, err := node.SplitRootPages()
 		if err != nil {
 			return nil, err
 		}
 		node = root
 		// FIXME:
-		// page, _ := GetPage(3)
 		Newnode, err := node.InsertNonfull(val)
 		if err != nil {
 			fmt.Println(err)
@@ -233,8 +232,6 @@ func (node *BtreePage) SplitPagesLeft(index int, splitpage uint16) (*BtreePage, 
 
 func (node *BtreePage) SplitRootPages() (*BtreePage, error) {
 	defer node.UpdatePageHeader()
-
-	// can make it static type slice
 	keys := make([]NodeComponent, 0)
 	splitVal := node.GetKeys()[Degree-1]
 	splitcell, err := node.GetCell(Degree - 1)
@@ -260,35 +257,19 @@ func (node *BtreePage) SplitRootPages() (*BtreePage, error) {
 		keys = append(keys, NodeComponent{key: cell.CellContent, LeftPointer: cell.Header.LeftChild})
 
 	}
-	// FIXME : rem println
-	fmt.Println("keys are ", keys)
 	for _, v := range keys {
 		newPage.AddCell(v.key, pager.AddCellOptions{LeftPointer: &v.LeftPointer})
 	}
-	// traverse to the leaf using its RightPointer only and append it there
-	// TODO: make a seperate such function
-
-	// for i := (Degree); i < len(keys); i++ {
-	// 	resp := make([]byte, 8)
-	// 	binary.BigEndian.PutUint64(resp, keys[i])
-	// 	// here adding the keys with its leftPointer
-	// 	newPage.AddCell(resp)
-	// }
-	// FIXME: this is actually end remove
+	// BUG: use node.rangeremove()
 	node.EndRangeRemoveSlots(Degree-1, uint(node.NumSlots))
 
 	node.UpdateRightPointer(uint(splitLeftkey), newPage)
-	// nodecell, _ := node.GetCell(3)
-	// newp, _ := GetPage(6)
-	// fmt.Printf("split page is %+v\n", newp.GetKeys())
-	// BUG: might be some bug here
 	rootpage, err := pager.MakePage(pager.ROOTPAGE, uint16(Init.TOTAL_PAGES))
 	if err != nil {
 		return nil, err
 	}
 	res := make([]byte, 8)
 	binary.BigEndian.PutUint64(res, uint64(splitVal))
-	// TODO: add the old page as the left pointer and right pointer as the newpage
 	node.PageType = pager.LEAF
 	if splitLeftkey != 0 {
 		node.PageType = pager.INTERIOR
@@ -320,10 +301,6 @@ func (page *BtreePage) Insertkey(key uint64, LeftChild uint16) (*BtreePage, erro
 	}
 	page.AddCell(buf, pager.AddCellOptions{LeftPointer: &LeftChild})
 	return nil, nil
-}
-
-func DFSTraversal() {
-
 }
 
 // BUG: this thing is storing stuff in the [] which is getting lots of memory
@@ -365,10 +342,6 @@ func BtreeTraversal() (*[][][]uint64, error) {
 	}
 	result = append(result, temp)
 	fmt.Println()
-	// fmt.Println("the main result is ", result)
-
-	// make temp queue function
-
 	return &result, nil
 
 }
@@ -392,4 +365,51 @@ func (node *BtreePage) traverse(pointers *coreAlgo.Queue) []uint64 {
 	}
 	return keys
 
+}
+
+func BtreeDFSTraversal() ([]uint64, error) {
+	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
+	if err != nil {
+		return nil, err
+	}
+	rootnode := BtreePage{*RootNode}
+	keys := make([]uint64, 0, 100)
+	if err := rootnode.dfstraverse(&keys); err != nil {
+		fmt.Println(keys)
+		return nil, err
+	}
+	return keys, nil
+}
+
+func (node *BtreePage) dfstraverse(keys *[]uint64) error {
+	if node.PageType == pager.LEAF || node.PageType == pager.ROOT_AND_LEAF {
+		*keys = append(*keys, node.GetKeys()...)
+		return nil
+	}
+	for i := uint(0); i <= uint(node.NumSlots); i++ {
+		var childPtr uint16
+		if i < uint(node.NumSlots) {
+			cell, err := node.GetCell(i)
+			if err != nil {
+				return err
+			}
+			childPtr = cell.Header.LeftChild
+		} else {
+			childPtr = node.RightPointer
+		}
+
+		childPage, err := pager.GetPage(uint(childPtr))
+		if err != nil {
+			return err
+		}
+		childNode := &BtreePage{*childPage}
+		if err := childNode.dfstraverse(keys); err != nil {
+			return err
+		}
+		if i < uint(node.NumSlots) {
+			cell, _ := node.GetCell(i)
+			*keys = append(*keys, binary.BigEndian.Uint64(cell.CellContent))
+		}
+	}
+	return nil
 }

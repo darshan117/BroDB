@@ -4,9 +4,20 @@ import (
 	Init "blackdb/init"
 	"blackdb/pager"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 )
+
+// type BothUnderFlowError struct {
+// 	message string
+// }
+
+// func (b *BothUnderFlowError) Error() string {
+// 	return b.message
+// }
+
+var BothUnderFlowError = errors.New("Both siblings are underFlow")
 
 // FIXME:
 func (node *BtreePage) isUnderFlow() bool {
@@ -22,9 +33,17 @@ func (nodePage *BtreePage) Shuffle() {
 	}
 	leftsib, rightsib, err := nodePage.chooseFrom()
 	if err != nil {
+		// var underflowerror *BothUnderFlowError
+		// if errors.As(err, &underflowerror) {
+		if err == BothUnderFlowError {
+			if rightsib == nil {
+				fmt.Println(leftsib)
+			}
+			// fmt.Println("both under flow", leftsib.GetKeys(), rightsib.GetKeys())
+			nodePage.MergeNodes(leftsib, rightsib)
+		}
 		return
 	}
-	// fmt.Println("left sibling is ", leftsib.GetKeys(), "rightsib is ", rightsib.GetKeys())
 	allKeys := make([]NodeComponent, 0, leftsib.NumSlots)
 	leftkeypairs := leftsib.GetkeysWithPointer()
 	allKeys = append(allKeys, leftkeypairs...)
@@ -67,18 +86,35 @@ func (nodePage *BtreePage) Shuffle() {
 	}
 	// fmt.Println("key to be ", keysToBeAdjusted, "mid point is ", midPoint, allKeys)
 	if midPoint > len(leftkeypairs) {
-		if err := rightsib.RemoveRange(0, uint(keysToBeAdjusted)); err != nil {
-			return
+		for i := 0; i < int(keysToBeAdjusted); i++ {
+			leftsib.AddCell(parentcell.CellContent, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
+			rightfirstCell, _ := rightsib.GetCell(0)
+			leftsib.RightPointer = uint16(rightfirstCell.Header.LeftChild)
+			parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(rightfirstCell.CellContent), parentcell.Header.LeftChild)
+			rightsib.RemoveCell(0)
+			// if err != nil {
+			// 	return
+			// }
+			leftsib.UpdatePageHeader()
+			rightsib.UpdatePageHeader()
+			parent.UpdatePageHeader()
+
 		}
-		leftsib.AddCell(parentcell.CellContent, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
-		leftsib.RightPointer = uint16(midkey.LeftPointer)
-		leftsib.UpdatePageHeader()
-		// FIXME : update leftsib pageheader
-		parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(midkey.key), parentcell.Header.LeftChild)
-		fmt.Println(allKeys[midPoint-1])
-		for _, v := range allKeys[midPoint-int(keysToBeAdjusted) : midPoint-1] {
-			leftsib.Insertkey(binary.BigEndian.Uint64(v.key), v.LeftPointer)
-		}
+		// if err := rightsib.RemoveRange(0, uint(keysToBeAdjusted)); err != nil {
+		// 	fmt.Println(
+		// 		"removeed",
+		// 	)
+		// 	return
+		// }
+		// leftsib.RightPointer = uint16(midkey.LeftPointer)
+		// leftsib.AddCell(parentcell.CellContent, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
+		// leftsib.UpdatePageHeader()
+		// // FIXME : update leftsib pageheader
+		// parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(midkey.key), parentcell.Header.LeftChild)
+		// for _, v := range allKeys[midPoint-int(keysToBeAdjusted) : midPoint-1] {
+		// 	leftsib.Insertkey(binary.BigEndian.Uint64(v.key), v.LeftPointer)
+		// }
+
 	} else {
 		if err := leftsib.RemoveRange(uint(midPoint), uint(leftsib.NumSlots)); err != nil {
 			return
@@ -108,7 +144,7 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	firstcell, err := node.GetCell(0)
 	if err != nil {
 		// fmt.Println(nodePage)
-		return nil, nil, fmt.Errorf("error getting the first cell %w", err)
+		return nil, nil, fmt.Errorf("error getting the first cell  %w", err)
 	}
 	leftPage, err := GetLeftPage(firstcell.CellContent)
 	if err != nil {
@@ -131,13 +167,18 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	} else {
 		rightcount = int(rightsib.NumSlots)
 	}
-	if leftcount == 0 && node.isUnderFlow() || rightcount == 0 && node.isUnderFlow() {
-		return nil, nil, fmt.Errorf("both siblings are Underflow")
+	if (leftsib != nil && leftsib.isUnderFlow()) && (rightsib != nil && rightsib.isUnderFlow()) {
+		fmt.Println("left underflow", node.isUnderFlow())
+		return leftsib, rightsib, BothUnderFlowError //&BothUnderFlowError{"both siblings are underflow"}
+
 	}
+	//  else if (rightsib != nil && rightsib.isUnderFlow()) && leftsib.isUnderFlow() {
+	// 	return leftsib, rightsib, BothUnderFlowError
+	// }
 
 	if leftcount > rightcount {
-		fmt.Println("going here ")
-		return leftsib, leftPage, nil
+		// sometimes the leftpage is same as the rightpage
+		return leftsib, rightsib, nil
 	}
 	return leftPage, rightsib, nil
 }
@@ -214,19 +255,14 @@ func (node *BtreePage) keyIsPresent(key uint64) bool {
 func (node *BtreePage) RightSiblingCount() (*BtreePage, error) {
 	firstcell, err := node.GetCell(0)
 	if err != nil {
-		// fmt.Println(nodePage)
-		fmt.Println(err)
 		return nil, err
-		// log.Fatal(err)
 	}
 	parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println("parent id is ", parentId)
 	parentPage, err := pager.GetPage(uint(*parentId))
 	if err != nil {
-		// fmt.Println(parentPage)
 		return nil, err
 	}
 	if *parentslot < parentPage.NumSlots-1 {
@@ -236,14 +272,12 @@ func (node *BtreePage) RightSiblingCount() (*BtreePage, error) {
 			return nil, err
 		}
 		leftPage, err := pager.GetPage(uint(parentCell.Header.LeftChild))
-		// fmt.Println("going to right page ")
 		if err != nil {
 			return nil, err
 		}
 		return &BtreePage{*leftPage}, nil
 
 	} else if *parentslot == parentPage.NumSlots-1 {
-		// fmt.Println("going to paren t	right page ")
 		rightPage, err := pager.GetPage(uint(parentPage.RightPointer))
 		if err != nil {
 			return nil, err
@@ -286,8 +320,6 @@ func GetLeftPage(key []byte) (*BtreePage, error) {
 func (node *BtreePage) LeftSiblingCount() (*BtreePage, error) {
 	firstcell, err := node.GetCell(0)
 	if err != nil {
-		// fmt.Println(nodePage)
-		fmt.Println(err)
 		return nil, err
 	}
 	parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
@@ -354,7 +386,50 @@ func (node *BtreePage) GetkeysWithPointer() []NodeComponent {
 
 }
 
-func (node *BtreePage) MergeNodes(withNode uint16) error {
+func (node *BtreePage) MergeNodes(leftNode *BtreePage, rightNode *BtreePage) error {
+	// rightNode parent is the newparent
+	// leftnode is added to the rightnode
+	for _, v := range leftNode.GetSlots() {
+		cell := leftNode.GetCellByOffset(v)
+		res := binary.BigEndian.Uint64(cell.CellContent)
+		rightNode.Insertkey(res, cell.Header.LeftChild)
+	}
+	firstcell, err := node.GetCell(0)
+	if err != nil {
+		return err
+	}
+	parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
+	if err != nil {
+		return err
+	}
+	parentPage, err := pager.GetPage(uint(*parentId))
+	if err != nil {
+		return err
+	}
+	parentCell, err := parentPage.GetCell(uint(*parentslot))
+	if err != nil {
+		return err
+	}
+	leftNode.RemoveRange(0, uint(leftNode.NumSlots))
+	pager.MakeFreelistPage(leftNode.PageId)
+	// left pointer might be zero here
+	// this is the issue
+	rightNode.Insertkey(binary.BigEndian.Uint64(parentCell.CellContent), leftNode.RightPointer)
+
+	// leftnode parent is added to the rightnode
+	parentPage.RemoveCell(uint(parentPage.NumSlots) - 1)
+	// if *parentslot == parentPage.NumSlots-1 {
+	// 	lastcell, err := rightNode.GetCell(0)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	pager.LoadPage(uint(parentPage.PageId))
+	// 	parentPage.ReplaceCell(&parentCell, binary.BigEndian.Uint64(lastcell.CellContent), parentCell.Header.LeftChild)
+
+	// } else {
+	// 	parentPage.RemoveCell(uint(*parentslot))
+	// 	//
+	// }
 	// if the page is interior then first replace the node and then merge with the remaining and the shuffle
 
 	return nil

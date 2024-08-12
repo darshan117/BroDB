@@ -142,9 +142,6 @@ func LoadPage(pageNo uint) error {
 	}
 	BufData.Data, err = syscall.Mmap(int(Init.Dbfile.Fd()), int64(offset), int(mapSize()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		fmt.Println("map size is ", mapSize())
-		// syscall.Munmap(BufData.Data)
-		// return LoadPage(pageNo)
 		return fmt.Errorf("error is %w", err)
 	}
 	BufData.PageNum = pageNo

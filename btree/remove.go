@@ -33,7 +33,7 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 		leftchildPage := BtreePage{*leftchild}
 		// if the left child page is not underflow
 		if leftchildPage.NumSlots <= uint16(UNDERFLOW) {
-		// node.shuffle or node . merge
+			// node.shuffle or node . merge
 			return nil
 		}
 		// then get the right pointers leftmostpage() or directly shuffle with merging
@@ -54,6 +54,7 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 		}
 		fmt.Println(slot, "is slot ", binary.BigEndian.Uint64(rightChildCell.CellContent))
 		fmt.Printf("after page is %+v \n", pageid)
+		node.Shuffle()
 
 		// go to the rightmost pointer and replace it the right most
 		// this might contain the concept of the adding the deleted page to the freelist
@@ -87,6 +88,7 @@ func Remove(key uint64) error {
 	if err := node.remove(key, uint(slot)); err != nil {
 		return err
 	}
+	// node.Shuffle()
 
 	return nil
 
