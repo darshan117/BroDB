@@ -182,34 +182,39 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i <= 40; i++ {
+	for i := 0; i <= 300; i++ {
 		rnode.Insert(uint64(i))
-		// btree.BtreeTraversal()
 	}
+	for i := uint64(10); i <= 300; i++ {
+		btree.Remove(i)
+		btree.BtreeTraversal()
+
+	}
+	// btree.Remove(26)
 	// search 9 and get its right child
 	// btree.Remove(28)
 	// btree.BtreeTraversal()
-	btree.Remove(21)
-	btree.BtreeTraversal()
-	btree.Remove(22)
-	btree.BtreeTraversal()
-	btree.Remove(20)
-	btree.BtreeTraversal()
+	// btree.Remove(21)
 	// btree.BtreeTraversal()
-	btree.Remove(18)
-	btree.BtreeTraversal()
-	// btree.Remove(24)
-	btree.Remove(6)
-	btree.BtreeTraversal()
-	btree.Remove(23)
-	btree.Remove(24)
-	btree.BtreeTraversal()
+	// btree.Remove(22)
+	// btree.BtreeTraversal()
+	// btree.Remove(20)
+	// btree.BtreeTraversal()
+	// // btree.BtreeTraversal()
 	// btree.Remove(18)
+	// btree.BtreeTraversal()
+	// // btree.Remove(24)
+	// btree.Remove(6)
+	// btree.BtreeTraversal()
+	// btree.Remove(23)
+	// btree.Remove(24)
+	// btree.BtreeTraversal()
+	// // btree.Remove(18)
 	// btree.Remove(0)
 	// btree.Remove(10)
 	// btree.Remove(2)
-	btree.Remove(13)
-	btree.BtreeTraversal()
-	btree.Remove(12)
+	// btree.Remove(13)
+	// btree.BtreeTraversal()
+	// btree.Remove(12)
 	btree.BtreeTraversal()
 }

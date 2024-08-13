@@ -29,7 +29,7 @@ func (node *BtreePage) isUnderFlow() bool {
 }
 
 func (nodePage *BtreePage) Shuffle() {
-	if nodePage.PageType == pager.ROOT_AND_LEAF {
+	if nodePage.PageType == pager.ROOT_AND_LEAF || nodePage.PageType == pager.ROOTPAGE {
 		return
 	}
 	leftsib, rightsib, err := nodePage.chooseFrom()
@@ -451,10 +451,22 @@ func (node *BtreePage) MergeNodes() error {
 			return err
 		}
 		parent := BtreePage{*parentPage}
-		if parent.isUnderFlow() {
+		// FIXME: should be parent.pagetype == rootpage
+		if parent.NumSlots == 1 {
+
+			Init.UpdateRootPage(uint(rightNode.PageId))
+			if rightNode.PageType == pager.LEAF && parent.PageType == pager.INTERIOR {
+				rightNode.PageType = pager.INTERIOR
+			} else if rightNode.PageType == pager.LEAF {
+				rightNode.PageType = pager.ROOT_AND_LEAF
+			} else {
+				rightNode.PageType = pager.ROOTPAGE
+
+			}
+			rightNode.UpdatePageHeader()
 			// FIXME: if the parent is rootPage then merge with rootpage
-			fmt.Println("shuffling parent", parentCell.CellContent)
-			parent.Shuffle()
+			// fmt.Println("shuffling parent", parentCell.CellContent)
+			// parent.Shuffle()
 		}
 		leftNode.RemoveRange(0, uint(leftNode.NumSlots))
 		pager.MakeFreelistPage(leftNode.PageId)
@@ -467,6 +479,7 @@ func (node *BtreePage) MergeNodes() error {
 		parentPage.RemoveCell(uint(*parentslot))
 		// parent := BtreePage{*parentPage}
 		// rightNode.Shuffle()
+
 		parent.Shuffle()
 
 	}

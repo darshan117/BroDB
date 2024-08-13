@@ -12,7 +12,7 @@ type RemoveOptions struct {
 
 func (node *BtreePage) remove(key uint64, slot uint) error {
 	// if the node is the leaf page then remove easyily
-	if node.PageType == pager.LEAF || node.PageType == pager.ROOT_AND_LEAF {
+	if node.PageType == pager.LEAF {
 
 		if err := node.RemoveCell(slot); err != nil {
 			return err
@@ -30,6 +30,11 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 		// }
 		node.Shuffle()
 		return nil
+	} else if node.PageType == pager.ROOT_AND_LEAF {
+		if err := node.RemoveCell(slot); err != nil {
+			return err
+		}
+
 	} else if node.PageType == pager.INTERIOR || node.PageType == pager.ROOTPAGE {
 		// TODO: get node.leftchild could be a helper function
 		keyCell, err := node.GetCell(slot)
