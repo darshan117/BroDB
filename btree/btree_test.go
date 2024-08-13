@@ -146,46 +146,21 @@ func BenchInsert(b *testing.B) {
 	b.Elapsed().Microseconds()
 
 }
-func TestRemove(t *testing.T) {
+
+func TestBalancedInsert(t *testing.T) {
+	t.Skip()
 	Initialize()
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i <= 30; i++ {
+	for i := 0; i <= 200; i++ {
 		rnode.Insert(uint64(i))
-		// btree.BtreeTraversal()
 	}
-	// search 9 and get its right child
-	_, pageid, err := btree.Search(31)
-	if err != nil {
-		t.Error(err)
-	}
-	newpage, err := pager.GetPage(uint(pageid))
-	if err != nil {
-		t.Error(err)
-	}
-	rightpage, err := pager.GetPage(uint(newpage.RightPointer))
-	rightrightpage, err := pager.GetPage(uint(rightpage.RightPointer))
-	fmt.Println("keys are ", rightrightpage.GetKeys())
 	testkeys := make([]uint64, 0, 200)
-	for i := 0; i <= 30; i++ {
+	for i := 0; i <= 200; i++ {
 		testkeys = append(testkeys, uint64(i))
 	}
-	btree.Remove(28)
-	btree.BtreeTraversal()
-	btree.Remove(21)
-	btree.BtreeTraversal()
-	btree.Remove(22)
-	btree.BtreeTraversal()
-	btree.Remove(20)
-	btree.BtreeTraversal()
-	btree.Remove(23)
-	btree.BtreeTraversal()
-	btree.Remove(18)
-	btree.BtreeTraversal()
-	btree.Remove(24)
-	// btree.Remove(24)
 	allkeys, err := btree.BtreeDFSTraversal()
 	if err != nil {
 		t.Error(err)
@@ -198,6 +173,36 @@ func TestRemove(t *testing.T) {
 		`, testkeys, allkeys)
 	}
 
+	btree.BtreeTraversal()
+}
+func TestRemove(t *testing.T) {
+
+	Initialize()
+	rnode, err := btree.NewBtreePage()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i := 0; i <= 30; i++ {
+		rnode.Insert(uint64(i))
+		// btree.BtreeTraversal()
+	}
+	// search 9 and get its right child
+	// btree.Remove(28)
+	// btree.BtreeTraversal()
+	btree.Remove(21)
+	btree.BtreeTraversal()
+	btree.Remove(22)
+	btree.BtreeTraversal()
+	btree.Remove(20)
+	btree.BtreeTraversal()
+	// btree.BtreeTraversal()
+	btree.Remove(18)
+	btree.BtreeTraversal()
+	// btree.Remove(24)
+	btree.Remove(6)
+	btree.BtreeTraversal()
+	// btree.Remove(23)
+	btree.Remove(24)
 	// btree.Remove(18)
 	// btree.Remove(0)
 	// btree.Remove(10)

@@ -18,6 +18,7 @@ import (
 // }
 
 var BothUnderFlowError = errors.New("Both siblings are underFlow")
+var LeftSiblingError = errors.New("left siblings is first slot")
 
 // FIXME:
 func (node *BtreePage) isUnderFlow() bool {
@@ -32,7 +33,8 @@ func (nodePage *BtreePage) Shuffle() {
 		return
 	}
 	leftsib, rightsib, err := nodePage.chooseFrom()
-	if err != nil {
+	if err != nil && err != LeftSiblingError {
+		fmt.Println(err)
 		// var underflowerror *BothUnderFlowError
 		// if errors.As(err, &underflowerror) {
 		if err == BothUnderFlowError {
@@ -40,7 +42,7 @@ func (nodePage *BtreePage) Shuffle() {
 				fmt.Println(leftsib)
 			}
 			// fmt.Println("both under flow", leftsib.GetKeys(), rightsib.GetKeys())
-			nodePage.MergeNodes(leftsib, rightsib)
+			// nodePage.MergeNodes(leftsib, rightsib)
 		}
 		return
 	}
@@ -152,14 +154,6 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	}
 	rightcount := 0
 
-	// get the leftpage parenjt
-	leftsib, err := node.LeftSiblingCount()
-	if err != nil || leftsib.isUnderFlow() {
-		leftcount = 0
-	} else {
-		leftcount = int(leftsib.NumSlots)
-	}
-
 	rightsib, err := node.RightSiblingCount()
 	if err != nil || rightsib.isUnderFlow() {
 		rightcount = 0
@@ -167,18 +161,51 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	} else {
 		rightcount = int(rightsib.NumSlots)
 	}
-	if (leftsib != nil && leftsib.isUnderFlow()) && (rightsib != nil && rightsib.isUnderFlow()) {
-		fmt.Println("left underflow", node.isUnderFlow())
-		return leftsib, rightsib, BothUnderFlowError //&BothUnderFlowError{"both siblings are underflow"}
-
+	// get the leftpage parenjt
+	leftsib, err := node.LeftSiblingCount()
+	if err != nil || leftsib.isUnderFlow() {
+		leftcount = 0
+		if err == LeftSiblingError {
+			return leftPage, rightsib, LeftSiblingError
+		}
+	} else {
+		leftcount = int(leftsib.NumSlots)
 	}
+
+	fmt.Println(leftPage.NumSlots, leftPage.GetKeys())
+
+	if int(leftPage.NumSlots)+rightcount+1 <= NODEFULL && leftcount+int(leftPage.NumSlots)+1 <= NODEFULL {
+		// TODO: for now nil ,nil
+		if leftcount > rightcount {
+			// sometimes the leftpage is same as the rightpage
+			return leftsib, leftPage, BothUnderFlowError
+		}
+
+		return leftPage, rightsib, BothUnderFlowError
+	}
+
+	// max := rightsib.NumSlots + leftsib.NumSlots
+	// if ((leftsib != nil && leftsib.isUnderFlow()) && (rightsib != nil && rightsib.isUnderFlow())) || (leftsib != nil && rightsib != nil) && (int(leftsib.NumSlots+rightsib.NumSlots) < NODEFULL) {
+	// 	fmt.Println("left underflow", node.isUnderFlow())
+	// 	return leftsib, rightsib, BothUnderFlowError //&BothUnderFlowError{"both siblings are underflow"}
+
+	// }
+	if (leftsib == nil || leftsib.isUnderFlow()) && (rightsib == nil || rightsib.isUnderFlow()) {
+		return leftsib, rightsib, BothUnderFlowError
+	}
+
+	// // If we have both siblings and their combined keys are less than NODEFULL
+	// if leftsib != nil && rightsib != nil && int(leftsib.NumSlots+rightsib.NumSlots) < NODEFULL {
+	// 	return leftsib, rightsib, BothUnderFlowError
+	// }
+
 	//  else if (rightsib != nil && rightsib.isUnderFlow()) && leftsib.isUnderFlow() {
 	// 	return leftsib, rightsib, BothUnderFlowError
 	// }
 
 	if leftcount > rightcount {
 		// sometimes the leftpage is same as the rightpage
-		return leftsib, rightsib, nil
+		return leftsib, leftPage, nil
 	}
 	return leftPage, rightsib, nil
 }
@@ -339,7 +366,7 @@ func (node *BtreePage) LeftSiblingCount() (*BtreePage, error) {
 		if err != nil {
 			return nil, err
 		}
-		return (&BtreePage{*leftPage}), nil
+		return (&BtreePage{*leftPage}), LeftSiblingError
 
 	} else if *parentslot > 0 {
 		parentCell, err := parentPage.GetCell(uint(*parentslot) - 1)
@@ -388,6 +415,11 @@ func (node *BtreePage) GetkeysWithPointer() []NodeComponent {
 
 func (node *BtreePage) MergeNodes(leftNode *BtreePage, rightNode *BtreePage) error {
 	// rightNode parent is the newparent
+	// CHECK IF THE NODE IS THE ROOTPAGE NO MERGING
+	if node.PageType == pager.ROOTPAGE {
+		fmt.Println("rootpage")
+	}
+	// if node.PageType == pager.LEAF {
 	// leftnode is added to the rightnode
 	for _, v := range leftNode.GetSlots() {
 		cell := leftNode.GetCellByOffset(v)
@@ -418,6 +450,10 @@ func (node *BtreePage) MergeNodes(leftNode *BtreePage, rightNode *BtreePage) err
 
 	// leftnode parent is added to the rightnode
 	parentPage.RemoveCell(uint(parentPage.NumSlots) - 1)
+	parent := BtreePage{*parentPage}
+	parent.Shuffle()
+
+	// }
 	// if *parentslot == parentPage.NumSlots-1 {
 	// 	lastcell, err := rightNode.GetCell(0)
 	// 	if err != nil {

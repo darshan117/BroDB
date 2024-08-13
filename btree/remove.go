@@ -13,10 +13,21 @@ type RemoveOptions struct {
 func (node *BtreePage) remove(key uint64, slot uint) error {
 	// if the node is the leaf page then remove easyily
 	if node.PageType == pager.LEAF || node.PageType == pager.ROOT_AND_LEAF {
-		fmt.Println("removing the key ", key)
+
 		if err := node.RemoveCell(slot); err != nil {
 			return err
 		}
+		// if node.isUnderFlow() {
+		// 	leftsib, rightsib, err := node.chooseFrom()
+		// 	if err != nil && err == BothUnderFlowError {
+		// 		node.MergeNodes(leftsib, rightsib)
+		// 	}
+		// }
+
+		// if node.pagetype = rootpage and node.numslots -==1{
+
+		// merge interior nodes and
+		// }
 		node.Shuffle()
 		return nil
 	} else if node.PageType == pager.INTERIOR || node.PageType == pager.ROOTPAGE {
@@ -34,6 +45,11 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 		// if the left child page is not underflow
 		if leftchildPage.NumSlots <= uint16(UNDERFLOW) {
 			// node.shuffle or node . merge
+			rightsib, err := node.RightSiblingCount()
+			if err != nil {
+				return err
+			}
+			node.MergeNodes(&leftchildPage, rightsib)
 			return nil
 		}
 		// then get the right pointers leftmostpage() or directly shuffle with merging
@@ -46,28 +62,12 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 			return err
 		}
 		node.ReplaceCell(&keyCell, binary.BigEndian.Uint64(rightChildCell.CellContent), leftPointer)
-		fmt.Printf("before page is %+v \n", pageid)
 		// pager.LoadPage(uint(pageid.PageId))
 		if err := pageid.RemoveCell(uint(pageid.NumSlots) - 1); err != nil {
 			fmt.Println(err)
 			return err
 		}
-		fmt.Println(slot, "is slot ", binary.BigEndian.Uint64(rightChildCell.CellContent))
-		fmt.Printf("after page is %+v \n", pageid)
 		node.Shuffle()
-
-		// go to the rightmost pointer and replace it the right most
-		// this might contain the concept of the adding the deleted page to the freelist
-		//	   of the page zero
-		//    do the following thing
-		// 1. use the choose from function
-		// if err != nil and both sibs are underflow then merge the pages recursively
-		// make  a separate function for it
-
-		// add a function called the replace cell
-		// always take the leftsib as removing the last element is easy
-		// pager.ReplaceCell()
-		// range remove the left or the right
 
 	}
 	// difficult part is removing from the interior page or hte root page
@@ -76,6 +76,7 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 }
 
 func Remove(key uint64) error {
+	fmt.Println("removing the key ", key)
 	slot, pageId, err := Search(key)
 	if err != nil {
 		return err
@@ -85,6 +86,16 @@ func Remove(key uint64) error {
 		return err
 	}
 	node := BtreePage{*page}
+	fmt.Println(node.GetKeys())
+	if node.isUnderFlow() {
+		fmt.Println("node is underflow")
+		leftsib, rightsib, err := node.chooseFrom()
+		if err != nil && err == BothUnderFlowError {
+			// node.MergeNodes(leftsib, rightsib)
+			return err
+		}
+		fmt.Println("leftsib and right sib ", leftsib.GetKeys(), rightsib.GetKeys())
+	}
 	if err := node.remove(key, uint(slot)); err != nil {
 		return err
 	}
