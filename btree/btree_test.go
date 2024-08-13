@@ -182,7 +182,7 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i <= 30; i++ {
+	for i := 0; i <= 40; i++ {
 		rnode.Insert(uint64(i))
 		// btree.BtreeTraversal()
 	}
@@ -201,12 +201,15 @@ func TestRemove(t *testing.T) {
 	// btree.Remove(24)
 	btree.Remove(6)
 	btree.BtreeTraversal()
-	// btree.Remove(23)
+	btree.Remove(23)
 	btree.Remove(24)
+	btree.BtreeTraversal()
 	// btree.Remove(18)
 	// btree.Remove(0)
 	// btree.Remove(10)
 	// btree.Remove(2)
-	// btree.Remove(16)
+	btree.Remove(13)
+	btree.BtreeTraversal()
+	btree.Remove(12)
 	btree.BtreeTraversal()
 }

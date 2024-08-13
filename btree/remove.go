@@ -42,23 +42,22 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 			return err
 		}
 		leftchildPage := BtreePage{*leftchild}
-		// if the left child page is not underflow
 		if leftchildPage.NumSlots <= uint16(UNDERFLOW) {
 			// node.shuffle or node . merge
-			rightsib, err := node.RightSiblingCount()
-			if err != nil {
-				return err
-			}
-			node.MergeNodes(&leftchildPage, rightsib)
-			return nil
+			fmt.Println("left page has less childs	")
+			leftchildPage.MergeNodes()
+			// return nil
 		}
+		// if the left child page is not underflow
 		// then get the right pointers leftmostpage() or directly shuffle with merging
 		pageid, err := leftchildPage.GetrightmostPage()
 		if err != nil {
+			fmt.Println(err)
 			return err
 		}
 		rightChildCell, err := pageid.GetCell(uint(pageid.NumSlots - 1))
 		if err != nil {
+			fmt.Println(err)
 			return err
 		}
 		node.ReplaceCell(&keyCell, binary.BigEndian.Uint64(rightChildCell.CellContent), leftPointer)
@@ -67,7 +66,12 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 			fmt.Println(err)
 			return err
 		}
+		rightchildpage := BtreePage{*pageid}
+		// pager.LoadPage(uint(node.PageId))
+		leftchildPage.Shuffle()
+		rightchildpage.Shuffle()
 		node.Shuffle()
+		fmt.Println("key remov", key)
 
 	}
 	// difficult part is removing from the interior page or hte root page
@@ -89,14 +93,10 @@ func Remove(key uint64) error {
 	fmt.Println(node.GetKeys())
 	if node.isUnderFlow() {
 		fmt.Println("node is underflow")
-		leftsib, rightsib, err := node.chooseFrom()
-		if err != nil && err == BothUnderFlowError {
-			// node.MergeNodes(leftsib, rightsib)
-			return err
-		}
-		fmt.Println("leftsib and right sib ", leftsib.GetKeys(), rightsib.GetKeys())
+		node.MergeorRedistribute()
 	}
 	if err := node.remove(key, uint(slot)); err != nil {
+		fmt.Println(err)
 		return err
 	}
 	// node.Shuffle()

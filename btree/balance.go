@@ -33,17 +33,11 @@ func (nodePage *BtreePage) Shuffle() {
 		return
 	}
 	leftsib, rightsib, err := nodePage.chooseFrom()
-	if err != nil && err != LeftSiblingError {
-		fmt.Println(err)
-		// var underflowerror *BothUnderFlowError
-		// if errors.As(err, &underflowerror) {
+	if err != nil && (err != LeftSiblingError) {
 		if err == BothUnderFlowError {
-			if rightsib == nil {
-				fmt.Println(leftsib)
-			}
-			// fmt.Println("both under flow", leftsib.GetKeys(), rightsib.GetKeys())
-			// nodePage.MergeNodes(leftsib, rightsib)
+			nodePage.MergeNodes()
 		}
+		fmt.Println(err)
 		return
 	}
 	allKeys := make([]NodeComponent, 0, leftsib.NumSlots)
@@ -413,47 +407,69 @@ func (node *BtreePage) GetkeysWithPointer() []NodeComponent {
 
 }
 
-func (node *BtreePage) MergeNodes(leftNode *BtreePage, rightNode *BtreePage) error {
+func (node *BtreePage) MergeNodes() error {
 	// rightNode parent is the newparent
 	// CHECK IF THE NODE IS THE ROOTPAGE NO MERGING
+	leftNode, rightNode, err := node.chooseFrom()
+	if err != nil && err != BothUnderFlowError {
+		// node.MergeNodes(leftsib, rightsib)
+		return err
+	}
+	if leftNode.NumSlots+rightNode.NumSlots+1 > NODEFULL {
+		fmt.Println("now its not underflow", leftNode.GetKeys(), rightNode.GetKeys())
+		return fmt.Errorf("now redistributing")
+		// redi
+	}
 	if node.PageType == pager.ROOTPAGE {
 		fmt.Println("rootpage")
 	}
-	// if node.PageType == pager.LEAF {
-	// leftnode is added to the rightnode
-	for _, v := range leftNode.GetSlots() {
-		cell := leftNode.GetCellByOffset(v)
-		res := binary.BigEndian.Uint64(cell.CellContent)
-		rightNode.Insertkey(res, cell.Header.LeftChild)
-	}
-	firstcell, err := node.GetCell(0)
-	if err != nil {
-		return err
-	}
-	parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
-	if err != nil {
-		return err
-	}
-	parentPage, err := pager.GetPage(uint(*parentId))
-	if err != nil {
-		return err
-	}
-	parentCell, err := parentPage.GetCell(uint(*parentslot))
-	if err != nil {
-		return err
-	}
-	leftNode.RemoveRange(0, uint(leftNode.NumSlots))
-	pager.MakeFreelistPage(leftNode.PageId)
-	// left pointer might be zero here
-	// this is the issue
-	rightNode.Insertkey(binary.BigEndian.Uint64(parentCell.CellContent), leftNode.RightPointer)
+	if node.PageType == pager.LEAF || node.PageType == pager.INTERIOR {
+		fmt.Println("this is the leaf page ")
+		fmt.Println("left and right keys are", leftNode.GetKeys(), rightNode.GetKeys())
+		// leftnode is added to the rightnode
+		for _, v := range leftNode.GetSlots() {
+			cell := leftNode.GetCellByOffset(v)
+			res := binary.BigEndian.Uint64(cell.CellContent)
+			rightNode.Insertkey(res, cell.Header.LeftChild)
+		}
+		firstcell, err := node.GetCell(0)
+		if err != nil {
+			return err
+		}
+		parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
+		if err != nil {
+			return err
+		}
+		parentPage, err := pager.GetPage(uint(*parentId))
+		if err != nil {
+			return err
+		}
+		// FIXME: check if the parent is underflow
 
-	// leftnode parent is added to the rightnode
-	parentPage.RemoveCell(uint(parentPage.NumSlots) - 1)
-	parent := BtreePage{*parentPage}
-	parent.Shuffle()
+		parentCell, err := parentPage.GetCell(uint(*parentslot))
+		if err != nil {
+			return err
+		}
+		parent := BtreePage{*parentPage}
+		if parent.isUnderFlow() {
+			// FIXME: if the parent is rootPage then merge with rootpage
+			fmt.Println("shuffling parent", parentCell.CellContent)
+			parent.Shuffle()
+		}
+		leftNode.RemoveRange(0, uint(leftNode.NumSlots))
+		pager.MakeFreelistPage(leftNode.PageId)
+		// left pointer might be zero here
+		// this is the issue
+		rightNode.Insertkey(binary.BigEndian.Uint64(parentCell.CellContent), leftNode.RightPointer)
 
-	// }
+		// leftnode parent is added to the rightnode
+		// BUG: the problem is fucking here
+		parentPage.RemoveCell(uint(*parentslot))
+		// parent := BtreePage{*parentPage}
+		// rightNode.Shuffle()
+		parent.Shuffle()
+
+	}
 	// if *parentslot == parentPage.NumSlots-1 {
 	// 	lastcell, err := rightNode.GetCell(0)
 	// 	if err != nil {
@@ -469,4 +485,12 @@ func (node *BtreePage) MergeNodes(leftNode *BtreePage, rightNode *BtreePage) err
 	// if the page is interior then first replace the node and then merge with the remaining and the shuffle
 
 	return nil
+}
+
+func (node *BtreePage) MergeorRedistribute() {
+	_, _, err := node.chooseFrom()
+	if err != nil && err == BothUnderFlowError {
+		fmt.Println("merging", node.GetKeys())
+		node.MergeNodes()
+	}
 }
