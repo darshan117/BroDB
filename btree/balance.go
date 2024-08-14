@@ -107,15 +107,14 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 		}
 		isbalanced = true
 	} else {
-		if err := leftsib.RemoveRange(uint(midPoint), uint(leftsib.NumSlots)); err != nil {
-			return
-		}
-		rightsib.Insertkey(binary.BigEndian.Uint64(parentcell.CellContent), leftsib.RightPointer) //, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
-		parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(midkey.key), parentcell.Header.LeftChild)
-		leftsib.RightPointer = midkey.LeftPointer
-		leftsib.UpdatePageHeader()
-		for _, v := range allKeys[midPoint-int(keysToBeAdjusted) : midPoint-1] {
-			rightsib.Insertkey(binary.BigEndian.Uint64(v.key), v.LeftPointer)
+		for i := 0; i < int(keysToBeAdjusted); i++ {
+			leftlastcell, _ := leftsib.GetCell(uint(leftsib.NumSlots) - 1)
+			rightsib.Insertkey(binary.BigEndian.Uint64(parentcell.CellContent), leftsib.RightPointer) //, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
+			parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(leftlastcell.CellContent), parentcell.Header.LeftChild)
+			leftsib.RightPointer = leftlastcell.Header.LeftChild
+			leftsib.UpdatePageHeader()
+			leftsib.RemoveCell(uint(leftsib.NumSlots) - 1)
+
 		}
 		isbalanced = true
 	}

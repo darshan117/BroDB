@@ -122,11 +122,12 @@ func TestBalancedInsert(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i <= 200; i++ {
+	nkeys := 20000
+	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
-	testkeys := make([]uint64, 0, 200)
-	for i := 0; i <= 200; i++ {
+	testkeys := make([]uint64, 0, nkeys)
+	for i := 0; i <= nkeys; i++ {
 		testkeys = append(testkeys, uint64(i))
 	}
 	allkeys, err := btree.BtreeDFSTraversal()
@@ -240,7 +241,7 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 1500
+	nkeys := 15000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
@@ -273,7 +274,7 @@ func TestRemove(t *testing.T) {
 	}
 }
 func BenchmarkInsertRemoveInsert(t *testing.B) {
-	// t.Skip()
+	t.Skip()
 	Initialize()
 	t.StartTimer()
 
@@ -332,7 +333,7 @@ func TestRemoveInsertRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 60
+	nkeys := 1700
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}

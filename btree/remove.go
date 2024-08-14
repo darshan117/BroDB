@@ -58,6 +58,7 @@ func (node *BtreePage) remove(slot uint) error {
 		rightchildpage.UpdatePageHeader()
 		node.UpdatePageHeader()
 		leftchildPage.Shuffle()
+		// FIXME:
 		rightchildpage.Shuffle()
 		node.Shuffle()
 	}
