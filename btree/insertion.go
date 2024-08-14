@@ -15,8 +15,6 @@ import (
 // }
 
 func NewBtreePage() (*BtreePage, error) {
-	// Degree = d
-
 	page, err := pager.MakePage(pager.ROOT_AND_LEAF, uint16(Init.TOTAL_PAGES))
 	if err != nil {
 		return nil, err
@@ -45,17 +43,11 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 				if err := page.AddCell(buf, pager.AddCellOptions{Index: &i}); err != nil {
 					return nil, err
 				}
-				fmt.Println(page.PageId)
-
-				fmt.Println("traversing")
-				BtreeTraversal()
-
 				page.Shuffle()
 				return page, nil
 			}
 		}
 		page.AddCell(buf)
-		BtreeTraversal()
 		page.Shuffle()
 		return page, nil
 	}
@@ -65,7 +57,6 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 			cell := page.GetCellByOffset(val)
 			res := binary.BigEndian.Uint64(cell.CellContent)
 			if res > key {
-				// leftcell, _ := page.GetCell(uint(i))
 				childPage, err := pager.GetPage(uint(cell.Header.LeftChild))
 				if err != nil {
 					return nil, err
@@ -73,47 +64,10 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 				if childPage.NumSlots == NODEFULL {
 					child := BtreePage{*childPage}
 					child.SplitPagesLeft(page)
-					child.UpdatePageHeader()
-					fmt.Println("btree traversal", page.NumSlots, child.NumSlots)
-					BtreeTraversal()
-
-					// pager.LoadPage(uint(childPage.PageId))
-
-					// npage, err := pager.GetPage(uint(child.PageId))
-					// if err != nil {
-					// 	return nil, err
-					// }
-					// page = &BtreePage{*npage}
-					page.UpdatePageHeader()
-
 					return page.InsertNonfull(key)
 				} else if cell.Header.LeftChild != uint16(0) {
 					page = &BtreePage{*childPage}
-
-					fmt.Printf("key is %d %+v \n", key, page.GetKeys())
-					fmt.Println("after shuffle")
-					// leftsib, rightsib, isbalanced := page.Shuffle()
-					// if isbalanced == true {
-					// 	firstcell, err := leftsib.GetCell(0)
-					// 	if err != nil {
-					// 		return nil, err
-					// 	}
-					// 	if binary.BigEndian.Uint64(firstcell.CellContent) > key {
-					// 		page = rightsib
-					// 	} else {
-					// 		page = leftsib
-					// 	}
-
-					// }
-					BtreeTraversal()
-					fmt.Println("num slots", page.NumSlots)
 					page.InsertNonfull(key)
-					npage, err := pager.GetPage(uint(page.PageId))
-					if err != nil {
-						return nil, err
-					}
-
-					page = &BtreePage{*npage}
 					page.Shuffle()
 					return nil, nil
 
@@ -198,7 +152,6 @@ func (node *BtreePage) Insert(val uint64) (*BtreePage, error) {
 // FIXME: no need for the key here
 func (childPage *BtreePage) SplitPagesRightAndInsert(node *BtreePage, key uint64) (*BtreePage, error) {
 	defer childPage.UpdatePageHeader()
-	// splitVal := childPage.GetKeys()[Degree-1]
 	splitcell, err := childPage.GetCell(uint(Degree - 1))
 	if err != nil {
 		return nil, err
@@ -241,8 +194,6 @@ func (childPage *BtreePage) SplitPagesRightAndInsert(node *BtreePage, key uint64
 	return nil, nil
 }
 
-// --------
-// make tr=he same as split right
 func (childPage *BtreePage) SplitPagesLeft(node *BtreePage) (*BtreePage, error) {
 	splitcell, err := childPage.GetCell(uint(Degree - 1))
 	if err != nil {
@@ -280,12 +231,9 @@ func (childPage *BtreePage) SplitPagesLeft(node *BtreePage) (*BtreePage, error) 
 
 	node.Insertkey(uint64(splitVal), newPage.PageId)
 	newPage.RightPointer = splitleftKey
-	fmt.Println("childpage has ", newPage.GetKeys(), newPage.PageId)
 	childPage.UpdatePageHeader()
 	node.UpdatePageHeader()
-	npage, _ := pager.GetPage(uint(newPage.PageId))
 	newPage.UpdatePageHeader()
-	fmt.Println("after childpage has ", npage.GetKeys())
 	return nil, nil
 }
 
@@ -320,7 +268,7 @@ func (node *BtreePage) SplitRootPages() (*BtreePage, error) {
 		newPage.AddCell(v.key, pager.AddCellOptions{LeftPointer: &v.LeftPointer})
 	}
 	// BUG: use node.rangeremove()
-	node.EndRangeRemoveSlots(Degree-1, uint(node.NumSlots))
+	node.RemoveRange(Degree-1, uint(node.NumSlots))
 
 	node.UpdateRightPointer(uint(splitLeftkey), newPage)
 	rootpage, err := pager.MakePage(pager.ROOTPAGE, uint16(Init.TOTAL_PAGES))
@@ -376,22 +324,18 @@ func BtreeTraversal() (*[][][]uint64, error) {
 	result = append(result, t)
 	fmt.Println()
 
-	fmt.Println("traver", t)
 	popcounter := len(pointers)
 	temp := make([][]uint64, 0)
 	for !pointers.IsEmpty() {
 		if popcounter == 0 {
 			popcounter = len(pointers)
 			result = append(result, temp[:])
-			// fmt.Println("temp is ", temp)
 			temp = make([][]uint64, 0)
 			fmt.Println()
 
 		}
 		pointToPage := pointers.Pop()
 		popcounter--
-		// fmt.Println("page number is ", *&pointers)
-
 		page, err := pager.GetPage(uint(pointToPage))
 		if err != nil {
 			return nil, fmt.Errorf("%w ", err)

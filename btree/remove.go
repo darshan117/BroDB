@@ -10,26 +10,12 @@ type RemoveOptions struct {
 	slot uint
 }
 
-func (node *BtreePage) remove(key uint64, slot uint) error {
-	// if the node is the leaf page then remove easyily
+func (node *BtreePage) remove(slot uint) error {
 	if node.PageType == pager.LEAF {
 
 		if err := node.RemoveCell(slot); err != nil {
 			return err
 		}
-		// if node.isUnderFlow() {
-		// 	leftsib, rightsib, err := node.chooseFrom()
-		// 	if err != nil && err == BothUnderFlowError {
-		// 		node.MergeNodes(leftsib, rightsib)
-		// 	}
-		// }
-
-		// if node.pagetype = rootpage and node.numslots -==1{
-
-		// merge interior nodes and
-		// }
-		fmt.Println("removing and t4rversing")
-		BtreeTraversal()
 		node.Shuffle()
 		return nil
 	} else if node.PageType == pager.ROOT_AND_LEAF {
@@ -50,13 +36,8 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 		}
 		leftchildPage := BtreePage{*leftchild}
 		if leftchildPage.NumSlots <= uint16(UNDERFLOW) {
-			// node.shuffle or node . merge
-			fmt.Println("left page has less childs	")
 			leftchildPage.MergeNodes()
-			// return nil
 		}
-		// if the left child page is not underflow
-		// then get the right pointers leftmostpage() or directly shuffle with merging
 		pageid, err := leftchildPage.GetrightmostPage()
 		if err != nil {
 			fmt.Println(err)
@@ -68,7 +49,6 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 			return err
 		}
 		node.ReplaceCell(&keyCell, binary.BigEndian.Uint64(rightChildCell.CellContent), leftPointer)
-		// pager.LoadPage(uint(pageid.PageId))
 		if err := pageid.RemoveCell(uint(pageid.NumSlots) - 1); err != nil {
 			fmt.Println(err)
 			return err
@@ -77,20 +57,15 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 		leftchildPage.UpdatePageHeader()
 		rightchildpage.UpdatePageHeader()
 		node.UpdatePageHeader()
-		// pager.LoadPage(uint(node.PageId))
 		leftchildPage.Shuffle()
 		rightchildpage.Shuffle()
 		node.Shuffle()
-		fmt.Println("key remov", key)
-
 	}
-	// difficult part is removing from the interior page or hte root page
 
 	return nil
 }
 
 func Remove(key uint64) error {
-	fmt.Println("removing the key ", key)
 	slot, pageId, err := Search(key)
 	if err != nil {
 		return err
@@ -100,18 +75,13 @@ func Remove(key uint64) error {
 		return err
 	}
 	node := BtreePage{*page}
-	fmt.Println(node.GetKeys())
-	// if node.isUnderFlow() {
-	// 	fmt.Println("node is underflow")
-	// 	node.MergeorRedistribute()
-	// }
 	nodePage, err := pager.GetPage(uint(node.PageId))
 	if err != nil {
 		return err
 	}
 	nPage := BtreePage{*nodePage}
-	// slot is now not valid
-	if err := nPage.remove(key, uint(slot)); err != nil {
+	// FIXME: slot is now not valid
+	if err := nPage.remove(uint(slot)); err != nil {
 		fmt.Println(err)
 		return err
 	}
@@ -120,7 +90,3 @@ func Remove(key uint64) error {
 	return nil
 
 }
-
-// TODO: replace key search for the key and
-
-// Get the rightmost child

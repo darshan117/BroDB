@@ -127,9 +127,6 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 
 }
 
-// func
-
-// }
 func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *BtreePage, err error) {
 	leftcount := 0
 	firstcell, err := node.GetCell(0)
@@ -154,11 +151,7 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	} else {
 		leftcount = int(leftsib.NumSlots)
 	}
-
-	fmt.Println(leftPage.NumSlots, leftPage.GetKeys())
-
 	if int(leftPage.NumSlots)+rightcount+1 <= NODEFULL && leftcount+int(leftPage.NumSlots)+1 <= NODEFULL {
-		// TODO: for now nil ,nil
 		if leftcount > rightcount {
 			return leftsib, leftPage, BothUnderFlowError
 		}
@@ -168,12 +161,6 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	if err == LeftSiblingError {
 		return leftPage, rightsib, LeftSiblingError
 	}
-
-	// no need of this
-	// if (leftsib == nil || leftsib.isUnderFlow()) && (rightsib == nil || rightsib.isUnderFlow()) {
-	// 	return leftsib, rightsib, BothUnderFlowError
-	// }
-
 	if leftcount > rightcount {
 		return leftsib, leftPage, nil
 	}
@@ -240,7 +227,6 @@ func (node *BtreePage) keyIsPresent(key uint64) bool {
 			return true
 		}
 	}
-	// check in the rightnode
 	return false
 
 }
@@ -366,16 +352,9 @@ func (node *BtreePage) MergeNodes() error {
 		return err
 	}
 	if leftNode.NumSlots+rightNode.NumSlots+1 > NODEFULL-1 {
-		fmt.Println("now its not underflow", leftNode.GetKeys(), rightNode.GetKeys())
 		return NoMergeRequired
-		// redi
-	}
-	if node.PageType == pager.ROOTPAGE {
-		fmt.Println("rootpage")
 	}
 	if node.PageType == pager.LEAF || node.PageType == pager.INTERIOR {
-		fmt.Println("this is the leaf page ")
-		fmt.Println("left and right keys are", leftNode.GetKeys(), rightNode.GetKeys())
 		// leftnode is added to the rightnode
 		for _, v := range leftNode.GetSlots() {
 			cell := leftNode.GetCellByOffset(v)
@@ -431,7 +410,6 @@ func (node *BtreePage) MergeNodes() error {
 func (node *BtreePage) MergeorRedistribute() {
 	_, _, err := node.chooseFrom()
 	if err != nil && err == BothUnderFlowError {
-		fmt.Println("merging", node.GetKeys())
 		if err := node.MergeNodes(); err == NoMergeRequired {
 			node.Shuffle()
 		}
