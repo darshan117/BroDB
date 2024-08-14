@@ -181,7 +181,7 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 200
+	nkeys := 1500
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
@@ -213,7 +213,7 @@ func TestRemove(t *testing.T) {
 	// btree.Remove(59)
 	for _, v := range remkeys {
 		fmt.Printf("----------------inserting %v -----------------\n", v)
-		// if v == 16 {
+		// if v == 48 {
 		// 	break
 		// }
 		rnode.Insert(v)
@@ -221,7 +221,7 @@ func TestRemove(t *testing.T) {
 		btree.BtreeTraversal()
 
 	}
-	// rnode.Insert(16)
+	// rnode.Insert(48)
 	fmt.Println(testkeys)
 	fmt.Println(remkeys)
 	// btree.Remove(71)

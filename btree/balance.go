@@ -30,26 +30,29 @@ func (node *BtreePage) isUnderFlow() bool {
 }
 
 // will return bool and left sib and right sib
-func (nodePage *BtreePage) Shuffle() {
+func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *BtreePage, balanced bool) {
+	isbalanced := false
 	nPage, err := pager.GetPage(uint(nodePage.PageId))
 	if err != nil {
-		return
+		return nil, nil, isbalanced
 	}
 	node := BtreePage{*nPage}
 	if nodePage.PageType == pager.ROOT_AND_LEAF || nodePage.PageType == pager.ROOTPAGE {
-		return
+		return nil, nil, isbalanced
 	}
 	leftsib, rightsib, err := node.chooseFrom()
 	if err != nil && (err != LeftSiblingError) && err != BothUnderFlowError {
-		fmt.Println(err)
-		return
+		return nil, nil, isbalanced
 	}
-	// if leftsib.PageId == node.PageId {
-	// 	leftsib = node
+	// if leftsib.PageId == nodePage.PageId {
+	// 	leftsib = *&nodePage
+	// } else if rightsib.PageId == nodePage.PageId {
+	// 	rightsib = *&nodePage
 	// }
 	if err == BothUnderFlowError {
+		// some fixes here
 		if err := nodePage.MergeNodes(); err != NoMergeRequired && err == nil {
-			return
+			return nil, nil, isbalanced
 		}
 	}
 	allKeys := make([]NodeComponent, 0, leftsib.NumSlots)
@@ -57,7 +60,7 @@ func (nodePage *BtreePage) Shuffle() {
 	allKeys = append(allKeys, leftkeypairs...)
 	firstcell, err := leftsib.GetCell(0)
 	if err != nil {
-		return
+		return nil, nil, isbalanced
 	}
 	parentslot, parentid, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
 	if err != nil {
@@ -100,48 +103,28 @@ func (nodePage *BtreePage) Shuffle() {
 			leftsib.RightPointer = uint16(rightfirstCell.Header.LeftChild)
 			parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(rightfirstCell.CellContent), parentcell.Header.LeftChild)
 			rightsib.RemoveCell(0)
-			// if err != nil {
-			// 	return
-			// }
 
 		}
-		// if err := rightsib.RemoveRange(0, uint(keysToBeAdjusted)); err != nil {
-		// 	fmt.Println(
-		// 		"removeed",
-		// 	)
-		// 	return
-		// }
-		// leftsib.RightPointer = uint16(midkey.LeftPointer)
-		// leftsib.AddCell(parentcell.CellContent, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
-		// leftsib.UpdatePageHeader()
-		// // FIXME : update leftsib pageheader
-		// parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(midkey.key), parentcell.Header.LeftChild)
-		// for _, v := range allKeys[midPoint-int(keysToBeAdjusted) : midPoint-1] {
-		// 	leftsib.Insertkey(binary.BigEndian.Uint64(v.key), v.LeftPointer)
-		// }
-
+		isbalanced = true
 	} else {
 		if err := leftsib.RemoveRange(uint(midPoint), uint(leftsib.NumSlots)); err != nil {
 			return
 		}
-		// TODO: need new function for insert with left Pointer
 		rightsib.Insertkey(binary.BigEndian.Uint64(parentcell.CellContent), leftsib.RightPointer) //, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
 		parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(midkey.key), parentcell.Header.LeftChild)
 		leftsib.RightPointer = midkey.LeftPointer
 		leftsib.UpdatePageHeader()
 		for _, v := range allKeys[midPoint-int(keysToBeAdjusted) : midPoint-1] {
-			fmt.Printf("all keys %+v\n mid key is %+v\n", v, allKeys[midPoint])
 			rightsib.Insertkey(binary.BigEndian.Uint64(v.key), v.LeftPointer)
 		}
+		isbalanced = true
 	}
 	nodePage.UpdatePageHeader()
 	leftsib.UpdatePageHeader()
 	rightsib.UpdatePageHeader()
 	parent.UpdatePageHeader()
+	return leftsib, rightsib, isbalanced
 
-	// check for the right siblings count
-	// check if node is underflow
-	// check if the node
 }
 
 // func
@@ -149,10 +132,8 @@ func (nodePage *BtreePage) Shuffle() {
 // }
 func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *BtreePage, err error) {
 	leftcount := 0
-	// pagecount := node.NumSlots
 	firstcell, err := node.GetCell(0)
 	if err != nil {
-		// fmt.Println(nodePage)
 		return nil, nil, fmt.Errorf("error getting the first cell  %w", err)
 	}
 	leftPage, err := GetLeftPage(firstcell.CellContent)
@@ -164,11 +145,9 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	rightsib, err := node.RightSiblingCount()
 	if err != nil || rightsib.isUnderFlow() {
 		rightcount = 0
-		// log.Fatal(err)
 	} else {
 		rightcount = int(rightsib.NumSlots)
 	}
-	// get the leftpage parenjt
 	leftsib, err := node.LeftSiblingCount()
 	if err != nil || leftsib.isUnderFlow() {
 		leftcount = 0
@@ -181,7 +160,6 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	if int(leftPage.NumSlots)+rightcount+1 <= NODEFULL && leftcount+int(leftPage.NumSlots)+1 <= NODEFULL {
 		// TODO: for now nil ,nil
 		if leftcount > rightcount {
-			// sometimes the leftpage is same as the rightpage
 			return leftsib, leftPage, BothUnderFlowError
 		}
 
@@ -191,27 +169,12 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 		return leftPage, rightsib, LeftSiblingError
 	}
 
-	// max := rightsib.NumSlots + leftsib.NumSlots
-	// if ((leftsib != nil && leftsib.isUnderFlow()) && (rightsib != nil && rightsib.isUnderFlow())) || (leftsib != nil && rightsib != nil) && (int(leftsib.NumSlots+rightsib.NumSlots) < NODEFULL) {
-	// 	fmt.Println("left underflow", node.isUnderFlow())
-	// 	return leftsib, rightsib, BothUnderFlowError //&BothUnderFlowError{"both siblings are underflow"}
-
-	// }
-	if (leftsib == nil || leftsib.isUnderFlow()) && (rightsib == nil || rightsib.isUnderFlow()) {
-		return leftsib, rightsib, BothUnderFlowError
-	}
-
-	// // If we have both siblings and their combined keys are less than NODEFULL
-	// if leftsib != nil && rightsib != nil && int(leftsib.NumSlots+rightsib.NumSlots) < NODEFULL {
-	// 	return leftsib, rightsib, BothUnderFlowError
-	// }
-
-	//  else if (rightsib != nil && rightsib.isUnderFlow()) && leftsib.isUnderFlow() {
+	// no need of this
+	// if (leftsib == nil || leftsib.isUnderFlow()) && (rightsib == nil || rightsib.isUnderFlow()) {
 	// 	return leftsib, rightsib, BothUnderFlowError
 	// }
 
 	if leftcount > rightcount {
-		// sometimes the leftpage is same as the rightpage
 		return leftsib, leftPage, nil
 	}
 	return leftPage, rightsib, nil
@@ -220,13 +183,11 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 func GetParent(key uint64) (*uint16, *uint16, error) {
 	//
 	rootpage, _ := pager.GetPage(uint(Init.ROOTPAGE))
-	// return GetParent(key)
 	root := BtreePage{*rootpage}
 	slot, pageid, err := root.NodeParent(key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w", err)
 	}
-	// fmt.Println(*slot, *pageid, "slot and pageid")
 	return slot, pageid, nil
 
 }
@@ -237,7 +198,6 @@ func (node *BtreePage) NodeParent(key uint64) (*uint16, *uint16, error) {
 		cell := node.GetCellByOffset(val)
 		res := binary.BigEndian.Uint64(cell.CellContent)
 		if res == key {
-			// fmt.Println("key is in the rootNode")
 			slot := uint16(i)
 			return &slot, &node.PageId, nil
 		} else if res > key {
@@ -247,14 +207,12 @@ func (node *BtreePage) NodeParent(key uint64) (*uint16, *uint16, error) {
 			}
 			lPage := BtreePage{*leftPage}
 			if lPage.keyIsPresent(key) {
-				// fmt.Printf("going to the left page %+v %d \n", leftPage, key)
 				slot := uint16(i)
 				return &slot, &node.PageId, nil
 			}
 			return lPage.NodeParent(key)
 		}
 	}
-	// slot, pageid, _ := node.parent()
 	if node.RightPointer != 0 {
 		rightPage, err := pager.GetPage(uint(node.RightPointer))
 		if err != nil {
@@ -275,7 +233,7 @@ func (node *BtreePage) NodeParent(key uint64) (*uint16, *uint16, error) {
 
 func (node *BtreePage) keyIsPresent(key uint64) bool {
 	for _, val := range node.GetSlots() {
-		// can do the binary search here
+		// FIXME: can do the binary search here
 		cell := node.GetCellByOffset(val)
 		res := binary.BigEndian.Uint64(cell.CellContent)
 		if res == key {
@@ -319,14 +277,7 @@ func (node *BtreePage) RightSiblingCount() (*BtreePage, error) {
 		return &BtreePage{*rightPage}, nil
 
 	}
-	// parentCell, err := parentPage.GetCell(uint(*parentslot))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// get the rightmost child or get the right pointer for this case need to make a sep function for it
-	// slot := uint16(0)
 	return &BtreePage{*parentPage}, nil
-	// return RightSiblingCount(binary.BigEndian.Uint64(parentCell.CellContent))
 }
 
 func GetLeftPage(key []byte) (*BtreePage, error) {
@@ -387,20 +338,9 @@ func (node *BtreePage) LeftSiblingCount() (*BtreePage, error) {
 		return (&BtreePage{*leftPage}), nil
 	} else if *parentslot == 0 {
 
-		// parentCell, err := parentPage.GetCell(uint(*parentslot))
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// leftPage, err := pager.GetPage(uint(parentCell.Header.LeftChild))
-		// if err != nil {
-		// 	return nil, err
-		// }
 		return nil, fmt.Errorf("parent is 0 so No left sibling")
-		// slots := uint16(0)
-		// return nil, fmt.Errorf("root Page and 0 slot cannot get the left sibling")
 
 	}
-	// get the rightmost child or get the right pointer for this case need to make a sep function for it
 	// BUG: raise error if not found
 	return (&BtreePage{*parentPage}).LeftSiblingCount()
 }
@@ -421,11 +361,8 @@ func (node *BtreePage) GetkeysWithPointer() []NodeComponent {
 }
 
 func (node *BtreePage) MergeNodes() error {
-	// rightNode parent is the newparent
-	// CHECK IF THE NODE IS THE ROOTPAGE NO MERGING
 	leftNode, rightNode, err := node.chooseFrom()
 	if err != nil && err != BothUnderFlowError {
-		// node.MergeNodes(leftsib, rightsib)
 		return err
 	}
 	if leftNode.NumSlots+rightNode.NumSlots+1 > NODEFULL-1 {
@@ -477,39 +414,16 @@ func (node *BtreePage) MergeNodes() error {
 
 			}
 			rightNode.UpdatePageHeader()
-			// FIXME: if the parent is rootPage then merge with rootpage
-			// fmt.Println("shuffling parent", parentCell.CellContent)
-			// parent.Shuffle()
 		}
 		leftNode.RemoveRange(0, uint(leftNode.NumSlots))
 		pager.MakeFreelistPage(leftNode.PageId)
-		// left pointer might be zero here
-		// this is the issue
 		rightNode.Insertkey(binary.BigEndian.Uint64(parentCell.CellContent), leftNode.RightPointer)
 
-		// leftnode parent is added to the rightnode
-		// BUG: the problem is fucking here
 		parentPage.RemoveCell(uint(*parentslot))
 		parentPage.UpdatePageHeader()
-		// parent := BtreePage{*parentPage}
-		// rightNode.Shuffle()
-
 		parent.Shuffle()
 
 	}
-	// if *parentslot == parentPage.NumSlots-1 {
-	// 	lastcell, err := rightNode.GetCell(0)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	pager.LoadPage(uint(parentPage.PageId))
-	// 	parentPage.ReplaceCell(&parentCell, binary.BigEndian.Uint64(lastcell.CellContent), parentCell.Header.LeftChild)
-
-	// } else {
-	// 	parentPage.RemoveCell(uint(*parentslot))
-	// 	//
-	// }
-	// if the page is interior then first replace the node and then merge with the remaining and the shuffle
 
 	return nil
 }

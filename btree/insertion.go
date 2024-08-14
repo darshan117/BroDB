@@ -92,16 +92,29 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 
 					fmt.Printf("key is %d %+v \n", key, page.GetKeys())
 					fmt.Println("after shuffle")
-					// page.Shuffle()
+					// leftsib, rightsib, isbalanced := page.Shuffle()
+					// if isbalanced == true {
+					// 	firstcell, err := leftsib.GetCell(0)
+					// 	if err != nil {
+					// 		return nil, err
+					// 	}
+					// 	if binary.BigEndian.Uint64(firstcell.CellContent) > key {
+					// 		page = rightsib
+					// 	} else {
+					// 		page = leftsib
+					// 	}
+
+					// }
 					BtreeTraversal()
 					fmt.Println("num slots", page.NumSlots)
+					page.InsertNonfull(key)
 					npage, err := pager.GetPage(uint(page.PageId))
 					if err != nil {
 						return nil, err
 					}
 
 					page = &BtreePage{*npage}
-					page.InsertNonfull(key)
+					page.Shuffle()
 					return nil, nil
 
 				}
