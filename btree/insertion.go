@@ -36,35 +36,74 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 			cell := page.GetCellByOffset(val)
 			res := binary.BigEndian.Uint64(cell.CellContent)
 			if res > key {
-				page.AddCell(buf, pager.AddCellOptions{Index: &i})
+
+				npage, err := pager.GetPage(uint(page.PageId))
+				if err != nil {
+					return nil, err
+				}
+				page = &BtreePage{*npage}
+				if err := page.AddCell(buf, pager.AddCellOptions{Index: &i}); err != nil {
+					return nil, err
+				}
+				fmt.Println(page.PageId)
+
+				fmt.Println("traversing")
+				BtreeTraversal()
+
 				page.Shuffle()
 				return page, nil
 			}
 		}
 		page.AddCell(buf)
+		BtreeTraversal()
 		page.Shuffle()
 		return page, nil
 	}
 	// FIXME: might remove the below if statement
 	if page.PageType == pager.ROOTPAGE || page.PageType == pager.INTERIOR {
-		for i, val := range page.GetSlots() {
+		for _, val := range page.GetSlots() {
 			cell := page.GetCellByOffset(val)
 			res := binary.BigEndian.Uint64(cell.CellContent)
 			if res > key {
-				leftcell, _ := page.GetCell(uint(i))
-				childPage, err := pager.GetPage(uint(leftcell.Header.LeftChild))
+				// leftcell, _ := page.GetCell(uint(i))
+				childPage, err := pager.GetPage(uint(cell.Header.LeftChild))
 				if err != nil {
 					return nil, err
 				}
 				if childPage.NumSlots == NODEFULL {
-					page.SplitPagesLeft(i, cell.Header.LeftChild)
+					child := BtreePage{*childPage}
+					child.SplitPagesLeft(page)
+					child.UpdatePageHeader()
+					fmt.Println("btree traversal", page.NumSlots, child.NumSlots)
+					BtreeTraversal()
+
+					// pager.LoadPage(uint(childPage.PageId))
+
+					// npage, err := pager.GetPage(uint(child.PageId))
+					// if err != nil {
+					// 	return nil, err
+					// }
+					// page = &BtreePage{*npage}
+					page.UpdatePageHeader()
+
 					return page.InsertNonfull(key)
-				} else if leftcell.Header.LeftChild != uint16(0) {
+				} else if cell.Header.LeftChild != uint16(0) {
 					page = &BtreePage{*childPage}
 
-					page.Shuffle()
-					// fmt.Printf("key is %d %+v \n", key, page.GetKeys())
-					return page.InsertNonfull(key)
+					fmt.Printf("key is %d %+v \n", key, page.GetKeys())
+					fmt.Println("after shuffle")
+					// page.Shuffle()
+					BtreeTraversal()
+					fmt.Println("num slots", page.NumSlots)
+					npage, err := pager.GetPage(uint(page.PageId))
+					if err != nil {
+						return nil, err
+					}
+
+					page = &BtreePage{*npage}
+					page.InsertNonfull(key)
+					return nil, nil
+
 				}
 			}
 		}
@@ -81,6 +120,12 @@ func (page *BtreePage) InsertNonfull(key uint64) (*BtreePage, error) {
 
 			}
 			page = &BtreePage{*rightChildPage}
+			npage, err := pager.GetPage(uint(page.PageId))
+			if err != nil {
+				return nil, err
+			}
+
+			page = &BtreePage{*npage}
 			page.InsertNonfull(key)
 			page.Shuffle()
 
@@ -137,6 +182,7 @@ func (node *BtreePage) Insert(val uint64) (*BtreePage, error) {
 	return nil, nil
 }
 
+// FIXME: no need for the key here
 func (childPage *BtreePage) SplitPagesRightAndInsert(node *BtreePage, key uint64) (*BtreePage, error) {
 	defer childPage.UpdatePageHeader()
 	// splitVal := childPage.GetKeys()[Degree-1]
@@ -172,24 +218,19 @@ func (childPage *BtreePage) SplitPagesRightAndInsert(node *BtreePage, key uint64
 	for _, v := range keyPairs {
 		newPage.AddCell(v.key, pager.AddCellOptions{LeftPointer: &v.LeftPointer})
 	}
-	childPage.EndRangeRemoveSlots(Degree-1, uint(childPage.NumSlots))
+	childPage.RemoveRange(Degree-1, uint(childPage.NumSlots))
 	node.Insertkey(splitVal, childPage.PageId)
 	node.RightPointer = newPage.PageId
 	newPage.RightPointer = childPage.RightPointer
 	childPage.RightPointer = splitleftKey
-	childPage.UpdatePageHeader()
 	newPage.UpdatePageHeader()
 	node.UpdatePageHeader()
 	return nil, nil
 }
 
 // --------
-
-func (node *BtreePage) SplitPagesLeft(index int, splitpage uint16) (*BtreePage, error) {
-	childPage, err := pager.GetPage(uint(splitpage))
-	if err != nil {
-		return nil, err
-	}
+// make tr=he same as split right
+func (childPage *BtreePage) SplitPagesLeft(node *BtreePage) (*BtreePage, error) {
 	splitcell, err := childPage.GetCell(uint(Degree - 1))
 	if err != nil {
 		return nil, err
@@ -222,11 +263,16 @@ func (node *BtreePage) SplitPagesLeft(index int, splitpage uint16) (*BtreePage, 
 	for _, v := range keyPairs {
 		newPage.AddCell(v.key, pager.AddCellOptions{LeftPointer: &v.LeftPointer})
 	}
-	childPage.StartRangeRemoveSlots(0, Degree)
+	childPage.RemoveRange(0, Degree)
 
 	node.Insertkey(uint64(splitVal), newPage.PageId)
 	newPage.RightPointer = splitleftKey
+	fmt.Println("childpage has ", newPage.GetKeys(), newPage.PageId)
+	childPage.UpdatePageHeader()
+	node.UpdatePageHeader()
+	npage, _ := pager.GetPage(uint(newPage.PageId))
 	newPage.UpdatePageHeader()
+	fmt.Println("after childpage has ", npage.GetKeys())
 	return nil, nil
 }
 

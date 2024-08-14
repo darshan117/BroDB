@@ -28,6 +28,8 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 
 		// merge interior nodes and
 		// }
+		fmt.Println("removing and t4rversing")
+		BtreeTraversal()
 		node.Shuffle()
 		return nil
 	} else if node.PageType == pager.ROOT_AND_LEAF {
@@ -72,6 +74,9 @@ func (node *BtreePage) remove(key uint64, slot uint) error {
 			return err
 		}
 		rightchildpage := BtreePage{*pageid}
+		leftchildPage.UpdatePageHeader()
+		rightchildpage.UpdatePageHeader()
+		node.UpdatePageHeader()
 		// pager.LoadPage(uint(node.PageId))
 		leftchildPage.Shuffle()
 		rightchildpage.Shuffle()
@@ -96,11 +101,17 @@ func Remove(key uint64) error {
 	}
 	node := BtreePage{*page}
 	fmt.Println(node.GetKeys())
-	if node.isUnderFlow() {
-		fmt.Println("node is underflow")
-		node.MergeorRedistribute()
+	// if node.isUnderFlow() {
+	// 	fmt.Println("node is underflow")
+	// 	node.MergeorRedistribute()
+	// }
+	nodePage, err := pager.GetPage(uint(node.PageId))
+	if err != nil {
+		return err
 	}
-	if err := node.remove(key, uint(slot)); err != nil {
+	nPage := BtreePage{*nodePage}
+	// slot is now not valid
+	if err := nPage.remove(key, uint(slot)); err != nil {
 		fmt.Println(err)
 		return err
 	}

@@ -80,7 +80,6 @@ func TestSearch(t *testing.T) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		// fmt.Println("KEY:", randval, "node key is ", node, "disk pages are ", diskPage.GetKeys(), "SLOT IS ", slot)
 		if !reflect.DeepEqual(node, diskPage.GetKeys()) {
 			t.Errorf("expected: \n%+v\n\n got:\n %+v\n", node, diskPage.GetKeys())
 		}
@@ -182,39 +181,93 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i <= 300; i++ {
+	nkeys := 200
+	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
-	for i := uint64(10); i <= 300; i++ {
-		btree.Remove(i)
+	// test := list.New()
+	testkeys := make([]uint64, 0, 200)
+	alltestkeys := make([]uint64, 0, 200)
+
+	for i := 0; i <= nkeys; i++ {
+		testkeys = append(testkeys, uint64(i))
+		alltestkeys = append(alltestkeys, uint64(i))
+	}
+
+	rng := rand.NewSource(1334)
+	src := rand.New(rng)
+	remkeys := make([]uint64, 0, 100)
+	btree.BtreeTraversal()
+	for i := 1; i <= nkeys; i++ {
+		n := src.Int63n(int64(len(testkeys)))
+		fmt.Printf("----------------removing %v -----------------\n", testkeys[n])
+		// if testkeys[n] == 59 {
+		// 	break
+		// }
+		fmt.Print(btree.Remove(testkeys[uint64(n)]))
+		remkeys = append(remkeys, testkeys[uint64(n)])
+		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
+		// btree.BtreeTraversal()
+
+	}
+	// btree.Remove(59)
+	for _, v := range remkeys {
+		fmt.Printf("----------------inserting %v -----------------\n", v)
+		// if v == 16 {
+		// 	break
+		// }
+		rnode.Insert(v)
+
 		btree.BtreeTraversal()
 
 	}
-	// btree.Remove(26)
-	// search 9 and get its right child
-	// btree.Remove(28)
-	// btree.BtreeTraversal()
-	// btree.Remove(21)
+	// rnode.Insert(16)
+	fmt.Println(testkeys)
+	fmt.Println(remkeys)
+	// btree.Remove(71)
 	// btree.BtreeTraversal()
 	// btree.Remove(22)
 	// btree.BtreeTraversal()
-	// btree.Remove(20)
-	// btree.BtreeTraversal()
-	// // btree.BtreeTraversal()
-	// btree.Remove(18)
-	// btree.BtreeTraversal()
-	// // btree.Remove(24)
-	// btree.Remove(6)
-	// btree.BtreeTraversal()
 	// btree.Remove(23)
-	// btree.Remove(24)
-	// btree.BtreeTraversal()
-	// // btree.Remove(18)
-	// btree.Remove(0)
-	// btree.Remove(10)
-	// btree.Remove(2)
-	// btree.Remove(13)
-	// btree.BtreeTraversal()
-	// btree.Remove(12)
+
+	allkeys, err := btree.BtreeDFSTraversal()
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(allkeys, alltestkeys) {
+		t.Errorf(
+			`
+		expected:%v,
+		got:%v
+		`, alltestkeys, allkeys)
+	}
+	fmt.Println("testkeys", testkeys)
 	btree.BtreeTraversal()
+}
+func removekeyFromarray(keys []uint64, element uint64) []uint64 {
+	for i, v := range keys {
+		if v == element {
+			keys = append(keys[:i], keys[i+1:]...)
+			return keys
+
+		}
+
+	}
+	return keys
+}
+func checktraversal() error {
+	allkeys, err := btree.BtreeDFSTraversal()
+	if err != nil {
+		return fmt.Errorf("traversal error %v", err)
+	}
+	lastval := 0
+	for _, v := range allkeys {
+		if lastval > int(v) {
+			return fmt.Errorf("%v is greater than %d", v, lastval)
+		}
+		lastval = int(v)
+
+	}
+
+	return nil
 }

@@ -13,6 +13,18 @@ func (tree *BtreePage) search(key uint64) (uint16, uint16, error) {
 	}
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf[0:], key)
+	if tree.PageType == pager.LEAF {
+		for i, val := range tree.GetSlots() {
+			// can do the binary search here
+			cell := tree.GetCellByOffset(val)
+			res := binary.BigEndian.Uint64(cell.CellContent)
+			if res == key {
+				return uint16(i), tree.PageId, nil
+			}
+
+		}
+		return 0, 0, fmt.Errorf("key not found %d", key)
+	}
 	for i, val := range tree.GetSlots() {
 		// can do the binary search here
 		cell := tree.GetCellByOffset(val)
