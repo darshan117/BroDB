@@ -297,8 +297,13 @@ func (page *BtreePage) Insertkey(key uint64, LeftChild uint16) (*BtreePage, erro
 		pager.GetPage(uint(page.PageId))
 	}
 	binary.BigEndian.PutUint64(buf[0:], key)
+	// fmt.Println(page.GetKeys())
 	for i := 0; i < int(page.NumSlots); i++ {
-		cell, _ := page.GetCell(uint(i))
+		cell, err := page.GetCell(uint(i))
+		if err != nil {
+			fmt.Println(err, "key is", key)
+			return nil, err
+		}
 		res := binary.BigEndian.Uint64(cell.CellContent)
 		if res > key {
 			return page, page.AddCell(buf, pager.AddCellOptions{Index: &i, LeftPointer: &LeftChild})

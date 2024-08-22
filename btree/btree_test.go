@@ -116,7 +116,7 @@ func BenchmarkInsert(b *testing.B) {
 }
 
 func TestBalancedInsert(t *testing.T) {
-	// t.Skip()
+	t.Skip()
 	Initialize()
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
@@ -162,7 +162,7 @@ func TestInsertRemoveInsert(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 500
+	nkeys := 10000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
@@ -179,6 +179,7 @@ func TestInsertRemoveInsert(t *testing.T) {
 	remkeys := make([]uint64, 0, 100)
 	for i := 1; i <= nkeys; i++ {
 		n := src.Int63n(int64(len(testkeys)))
+		fmt.Println("removing", testkeys[uint64(n)])
 		btree.Remove(testkeys[uint64(n)])
 		remkeys = append(remkeys, testkeys[uint64(n)])
 		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
@@ -328,14 +329,14 @@ func BenchmarkInsertRemoveInsert(t *testing.B) {
 	fmt.Println("this much time elapsed :,", t.Elapsed().String())
 }
 func TestRemoveInsertRemove(t *testing.T) {
-	t.Skip()
+	// t.Skip()
 
 	Initialize()
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 800
+	nkeys := 8000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
@@ -359,12 +360,8 @@ func TestRemoveInsertRemove(t *testing.T) {
 	}
 	for _, v := range remkeys {
 		fmt.Println("inserting ", v)
-		if v == 563 {
-			break
-		}
 		rnode.Insert(v)
 	}
-	rnode.Insert(563)
 	for _, v := range remkeys {
 		fmt.Println("removing ", v)
 		err = btree.Remove(v)
