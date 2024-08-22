@@ -182,6 +182,7 @@ func (node *BtreePage) NodeParent(key uint64) (*uint16, *uint16, error) {
 	binary.BigEndian.PutUint64(buf[0:], key)
 	for i, val := range node.GetSlots() {
 		cell := node.GetCellByOffset(val)
+		fmt.Println(cell.CellContent)
 		res := binary.BigEndian.Uint64(cell.CellContent)
 		if res == key {
 			slot := uint16(i)
