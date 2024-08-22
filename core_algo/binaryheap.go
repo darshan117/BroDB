@@ -1,4 +1,6 @@
-package pager
+// This package implements the heap data structure
+
+package coreAlgo
 
 import "fmt"
 
@@ -11,7 +13,7 @@ type Number interface {
 	uint16 | uint64 | uint
 }
 
-type heap[T Number] struct {
+type Heap[T Number] struct {
 	items []T
 }
 
@@ -30,37 +32,39 @@ func parentIndex[T Number](child T) T {
 }
 
 // check hasleftchild
-func (htree *heap[T]) hasLeftChild(parent T) bool {
+func (htree *Heap[T]) hasLeftChild(parent T) bool {
 	return T(len(htree.items)) > leftChildIndex(parent)
 }
 
 // check hasrightchild
-func (htree *heap[T]) hasRightChild(parent T) bool {
+func (htree *Heap[T]) hasRightChild(parent T) bool {
 	return T(len(htree.items)) > rightChildIndex(parent)
 }
 
 // check parent
-func (htree *heap[T]) hasParent(child T) bool { return parentIndex(child) >= 0 }
+func (htree *Heap[T]) hasParent(child T) bool { return parentIndex(child) >= 0 }
 
 // get parent
-func (htree *heap[T]) getParent(child T) T {
+func (htree *Heap[T]) getParent(child T) T {
 	return htree.items[parentIndex(child)]
 }
-func (htree *heap[T]) getLeftChild(parent T) T  { return htree.items[leftChildIndex(parent)] }
-func (htree *heap[T]) getRightChild(parent T) T { return htree.items[rightChildIndex(parent)] }
+func (htree *Heap[T]) getLeftChild(parent T) T  { return htree.items[leftChildIndex(parent)] }
+func (htree *Heap[T]) getRightChild(parent T) T { return htree.items[rightChildIndex(parent)] }
 
 // swap
-func (htree *heap[T]) swap(idx1, idx2 T) {
+func (htree *Heap[T]) swap(idx1, idx2 T) {
 	htree.items[idx1], htree.items[idx2] = htree.items[idx2], htree.items[idx1]
 }
 
-// add and remove
-func (htree *heap[T]) add(item T) {
+// it first append the item to the end of the list
+// then it find it is swapped with parent if the parent is
+// less then the item value
+func (htree *Heap[T]) Add(item T) {
 	htree.items = append(htree.items, item)
 	htree.heapifyUp()
 }
 
-func (htree *heap[T]) remove() (T, error) {
+func (htree *Heap[T]) Remove() (T, error) {
 	if len(htree.items) > 0 {
 		temp := htree.items[0]
 		htree.items[0] = htree.items[len(htree.items)-1]
@@ -73,7 +77,7 @@ func (htree *heap[T]) remove() (T, error) {
 
 }
 
-func (htree *heap[T]) heapifyUp() {
+func (htree *Heap[T]) heapifyUp() {
 	if len(htree.items) == 0 {
 		return
 	}
@@ -86,7 +90,7 @@ func (htree *heap[T]) heapifyUp() {
 
 }
 
-func (htree *heap[T]) heapifyDown() {
+func (htree *Heap[T]) heapifyDown() {
 	index := T(0)
 	for htree.hasLeftChild(index) {
 		maxIdx := leftChildIndex(index)

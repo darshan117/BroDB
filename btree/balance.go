@@ -332,15 +332,25 @@ func (node *BtreePage) LeftSiblingCount() (*BtreePage, error) {
 
 func (node *BtreePage) GetkeysWithPointer() []NodeComponent {
 	keyPairs := make([]NodeComponent, 0, node.NumSlots)
-	for _, v := range node.GetSlots() {
-		cell := node.GetCellByOffset(v)
+	for i := 0; i < int(node.NumSlots)-1; i++ {
+		cell, _ := node.GetCell(uint(i))
 		keyContent := make([]byte, len(cell.CellContent))
 		copy(keyContent, cell.CellContent)
 		keyPairs = append(keyPairs, NodeComponent{
 			key:         keyContent,
 			LeftPointer: cell.Header.LeftChild,
 		})
+
 	}
+	// for _, v := range node.GetSlots() {
+	// 	cell := node.GetCellByOffset(v)
+	// 	keyContent := make([]byte, len(cell.CellContent))
+	// 	copy(keyContent, cell.CellContent)
+	// 	keyPairs = append(keyPairs, NodeComponent{
+	// 		key:         keyContent,
+	// 		LeftPointer: cell.Header.LeftChild,
+	// 	})
+	// }
 	return keyPairs
 
 }

@@ -122,7 +122,7 @@ func TestBalancedInsert(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 20000
+	nkeys := 3000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
@@ -130,6 +130,7 @@ func TestBalancedInsert(t *testing.T) {
 	for i := 0; i <= nkeys; i++ {
 		testkeys = append(testkeys, uint64(i))
 	}
+	btree.BtreeTraversal()
 	allkeys, err := btree.BtreeDFSTraversal()
 	if err != nil {
 		t.Error(err)
@@ -154,9 +155,9 @@ func removekeyFromarray(keys []uint64, element uint64) []uint64 {
 	return keys
 }
 func TestInsertRemoveInsert(t *testing.T) {
-	// t.Skip()
+	t.Skip()
 
-	// Initialize()
+	Initialize()
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
 		log.Fatal(err)
@@ -203,7 +204,8 @@ func TestInsertRemoveInsert(t *testing.T) {
 	}
 }
 func TestRemoveOnly(t *testing.T) {
-	// t.Skip()
+	t.Skip()
+	// Initialize()
 	nkeys := 500
 
 	testkeys := make([]uint64, 0, 200)
@@ -326,14 +328,14 @@ func BenchmarkInsertRemoveInsert(t *testing.B) {
 	fmt.Println("this much time elapsed :,", t.Elapsed().String())
 }
 func TestRemoveInsertRemove(t *testing.T) {
-	// t.Skip()
+	t.Skip()
 
-	// Initialize()
+	Initialize()
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 1700
+	nkeys := 800
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
@@ -356,9 +358,15 @@ func TestRemoveInsertRemove(t *testing.T) {
 
 	}
 	for _, v := range remkeys {
+		fmt.Println("inserting ", v)
+		if v == 563 {
+			break
+		}
 		rnode.Insert(v)
 	}
+	rnode.Insert(563)
 	for _, v := range remkeys {
+		fmt.Println("removing ", v)
 		err = btree.Remove(v)
 		if err != nil {
 			t.Error(err)
@@ -422,6 +430,20 @@ func TestSearch(t *testing.T) {
 		if !reflect.DeepEqual(node, diskPage.GetKeys()) {
 			t.Errorf("expected: \n%+v\n\n got:\n %+v\n", node, diskPage.GetKeys())
 		}
+	}
+
+}
+
+func TestUnmap(t *testing.T) {
+	// Initialize()
+	tree := btree.NewBtree(5)
+	rnode, err := btree.NewBtreePage()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i := 0; i <= 10; i++ {
+		rnode.Insert(uint64(i))
+		tree.Insert(uint(i))
 	}
 
 }

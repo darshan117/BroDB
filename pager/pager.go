@@ -1,6 +1,7 @@
 package pager
 
 import (
+	coreAlgo "blackdb/core_algo"
 	Init "blackdb/init"
 	"bytes"
 	"encoding/binary"
@@ -16,6 +17,7 @@ var (
 	FREEPAGE_SIZE  uint = 2
 )
 
+// Makes a NewPage with all the required field from the PageHeader
 func MakePage(ptype PageType, id uint16) (*PageHeader, error) {
 	if ptype == ROOTPAGE {
 		Init.UpdateRootPage(uint(id))
@@ -45,12 +47,13 @@ func MakePage(ptype PageType, id uint16) (*PageHeader, error) {
 	return &page, nil
 }
 
+// Makes the initial Page which contains the MetaData
 func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 	pageHeader := make([]byte, Init.PAGE_SIZE-50)
 	page := PageHeader{
 		PageId:         id,
 		PageType:       ptype,
-		freeStart:      uint16(PAGEHEAD_SIZE) + 50, // contains hardcoded pageHeader size
+		freeStart:      uint16(PAGEHEAD_SIZE) + 50,
 		freeEnd:        uint16(Init.PAGE_SIZE),
 		NumSlots:       0,
 		lastOffsetUsed: 0,
@@ -58,7 +61,6 @@ func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 		flags:          8,
 	}
 	page.totalFree = page.freeEnd - page.freeStart
-	// FIXME: make a different helper functiuon to serialize the page Header
 	ser := page.serializePageHeader(pageHeader)
 	_, err := Init.Dbfile.Seek(50, 0) // 0 means relative to the origin of the file
 	if err != nil {
@@ -72,14 +74,17 @@ func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 
 }
 
+// Adds the newcell to the Page also has
+//
+// Features like  addcell at index and change its leftPointer
 func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error {
 	defer page.UpdatePageHeader()
-	if page.PageId != uint16(BufData.PageNum) {
-		err := LoadPage(uint(page.PageId))
-		if err != nil {
-			return err
-		}
+	// if page.PageId != uint16(BufData.PageNum) {
+	err := LoadPage(uint(page.PageId))
+	if err != nil {
+		return err
 	}
+	// }
 
 	cellSize := len(cellContent)
 	var cell Cell
@@ -166,7 +171,7 @@ func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 		return newPage.GetCell(idx)
 	}
 	if page.NumSlots <= uint16(idx) {
-		return Cell{}, fmt.Errorf("index not found in the page")
+		return Cell{}, fmt.Errorf("index not found in the page %d", idx)
 	}
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	offset := BufData.Data[slotIndex : slotIndex+2]
@@ -195,6 +200,9 @@ func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 }
 
 func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
+	if offset > 4096 {
+		return Cell{}
+	}
 	LoadPage(uint(page.PageId))
 	var cell Cell
 	cellHeaderSize := CELL_HEAD_SIZE
@@ -208,14 +216,14 @@ func (page *PageHeader) Defragment() error {
 	defer page.UpdatePageHeader()
 
 	slotarray := page.SlotArray()
-	binheap := heap[uint16]{}
+	binheap := coreAlgo.Heap[uint16]{}
 	destPointer := uint16(4096)
 	// HACK: did some changes here
 	for k := range slotarray {
-		binheap.add(k)
+		binheap.Add(k)
 	}
 	for i := 0; i < int(page.NumSlots); i++ {
-		offset, err := binheap.remove()
+		offset, err := binheap.Remove()
 		if err != nil {
 			return fmt.Errorf(" %w Error while removing the element from binheap", err)
 		}

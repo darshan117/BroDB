@@ -5,6 +5,7 @@ import (
 	Init "blackdb/init"
 	"blackdb/pager"
 	"fmt"
+	"log"
 	"os"
 	"syscall"
 )
@@ -23,55 +24,57 @@ func init() {
 }
 
 func main() {
-	// make the rootpage
-	// btree := pager.NewBtree()
-	rpage, err := btree.NewBtreePage()
+	rnode, err := btree.NewBtreePage()
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
-	keys := make([]uint64, 0)
-	for i := 1; i <= 10000; i++ {
-		// keys := []uint64{32, 24, 12, 30, 66, 88, 77, 50, 10, 33, 35, 42, 36, 37, 25, 26, 27, 19, 22, 21, 23, 1, 2, 3, 4, 87, 38, 39, 40, 45, 44,
-		// 	90, 91, 92, 93, 94, 95, 96}
+	nkeys := 30
+	fmt.Println("=----insert------=")
+	for i := 0; i <= nkeys; i++ {
+		rnode.Insert(uint64(i))
+	}
+	// testkeys := make([]uint64, 0, 200)
+	// alltestkeys := make([]uint64, 0, 200)
 
-		// keys = append(keys, uint64(rand.Int63n(1000)))
-		keys = append(keys, uint64(i))
-
-	}
-	for _, v := range keys {
-		rpage.Insert(v)
-	}
-	// btree.BtreeTraversal()
-	// _, id, err := btree.Search(55)
-	// if err != nil {
-	// 	log.Fatal(err)
+	// for i := 0; i <= nkeys; i++ {
+	// 	testkeys = append(testkeys, uint64(i))
+	// 	alltestkeys = append(alltestkeys, uint64(i))
 	// }
 
-	// fmt.Println("search gave the id ", id)
-	// pagid, _ := pager.GetPage(uint(id))
-	// fmt.Println(pagid.GetKeys())
+	btree.BtreeTraversal()
+	// fmt.Println("=------remove------=")
+	// rng := rand.NewSource(984)
+	// src := rand.New(rng)
+	// remkeys := make([]uint64, 0, 100)
+	// for i := 1; i <= nkeys; i++ {
+	// 	n := src.Int63n(int64(len(testkeys)))
+	// 	btree.Remove(testkeys[uint64(n)])
+	// 	remkeys = append(remkeys, testkeys[uint64(n)])
+	// 	testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
 
-	// rootpag, _ := pager.GetPage(1)
-	// newPage, _ := pager.GetPage(2)
-	// root, _ := pager.GetPage(3)
-	// splitpage, _ := pager.GetPage(4)
-	// rightsplitpage, _ := pager.GetPage(5)
-	// rightsplit, _ := pager.GetPage(6)
-	// rootpag, _ := pager.GetPage(1)
-	// fmt.Printf("\n old page is %+v %+v\n", rootpag.GetKeys(), rootpag)
-	// newPage, _ := pager.GetPage(2)
-	// fmt.Printf("new page is %+v %+v\n", newPage.GetKeys(), newPage)
-	// fmt.Printf("root page is %+v %+v\n", root.GetKeys(), root)
-	// fmt.Printf("split page is %+v %+v\n", splitpage.GetKeys(), splitpage)
-	// fmt.Printf("right split page is %+v %+v\n", rightsplitpage.GetKeys(), rightsplitpage)
-	// fmt.Printf("new right split page 6  is %+v %+v\n", rightsplit.GetKeys(), rightsplit)
-	// root, _ := pager.GetPage(3)
-	// rootpage.PageDebug()
-	// rootpage.InsertSlot(0)
+	// }
+	// btree.BtreeTraversal()
 
-	// fmt.Println(rootpage.GetSlots())
+	// fmt.Println("=----insert------=")
+	// for _, v := range remkeys {
+	// 	rnode.Insert(v)
+	// }
+	// btree.BtreeTraversal()
+	// fmt.Println("=------remove------=")
+	// for _, v := range remkeys {
+	// 	err = btree.Remove(v)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// }
+	// btree.BtreeTraversal()
 
-	// rootpage.PageDebug()
+	// fmt.Println(testkeys)
+	// allkeys, err := btree.BtreeDFSTraversal()
+	// if err != nil {
+	// 	return
+	// }
+	// fmt.Println(allkeys)
 
 	defer file.Close()
 
@@ -82,4 +85,16 @@ func main() {
 			}
 		}
 	}()
+}
+
+func removekeyFromarray(keys []uint64, element uint64) []uint64 {
+	for i, v := range keys {
+		if v == element {
+			keys = append(keys[:i], keys[i+1:]...)
+			return keys
+
+		}
+
+	}
+	return keys
 }

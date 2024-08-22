@@ -49,7 +49,9 @@ func deserializePageHeader(pageHeader []byte) PageHeader {
 	return Header
 
 }
-func (page *PageHeader) UpdatePageHeader() {
+
+// dbwrite don't use the loadpage
+func (page *PageHeader) UpdatePageHeader() error {
 	if page.PageId != uint16(BufData.PageNum) {
 		err := LoadPage(uint(page.PageId))
 		if err != nil {
@@ -59,7 +61,14 @@ func (page *PageHeader) UpdatePageHeader() {
 	}
 	pageHeader := make([]byte, PAGEHEAD_SIZE)
 	page.serializePageHeader(pageHeader)
-	copy(BufData.Data[:PAGEHEAD_SIZE], pageHeader)
+	// fmt.Println("pageheader is ", pageHeader)
+	// copy(BufData.Data[:PAGEHEAD_SIZE], pageHeader)
+	offset := int64(page.PageId) * int64(Init.PAGE_SIZE)
+	_, err := Init.Dbfile.WriteAt(pageHeader, int64(offset)) // 0 means relative to the origin of the file
+	if err != nil {
+		return fmt.Errorf("error incrementing the total pages : %w", err)
+	}
+	return nil
 
 }
 
@@ -142,7 +151,7 @@ func LoadPage(pageNo uint) error {
 	}
 	BufData.Data, err = syscall.Mmap(int(Init.Dbfile.Fd()), int64(offset), int(mapSize()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		return fmt.Errorf("error is %w", err)
+		return fmt.Errorf("error while mapping the new page %w", err)
 	}
 	BufData.PageNum = pageNo
 	return nil
