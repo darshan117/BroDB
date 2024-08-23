@@ -37,12 +37,11 @@ func MakePage(ptype PageType, id uint16) (*PageHeader, error) {
 	ser := page.serializePageHeader(pageHeader)
 	_, err := Init.Dbfile.Write(ser)
 	if err != nil {
-		return &PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
+		return nil, PagerError("MakePage", ErrDbWriteError, fmt.Errorf("%w", err))
 	}
 	IncrementTotalPages()
-	err = LoadPage(uint(id))
-	if err != nil {
-		return &PageHeader{}, fmt.Errorf("error while Loading the page | %w", err)
+	if err = LoadPage(uint(id)); err != nil {
+		return nil, PagerError("MakePage", ErrLoadPage, fmt.Errorf("%w", err))
 	}
 	return &page, nil
 }
@@ -64,11 +63,11 @@ func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 	ser := page.serializePageHeader(pageHeader)
 	_, err := Init.Dbfile.Seek(50, 0) // 0 means relative to the origin of the file
 	if err != nil {
-		return PageHeader{}, fmt.Errorf("error seeking to offset: %w", err)
+		return PageHeader{}, PagerError("MakePageZero", fmt.Errorf("error while seek in dbfile "), fmt.Errorf("%w", err))
 	}
 	_, err = Init.Dbfile.Write(ser) // magic code Brodb
 	if err != nil {
-		return PageHeader{}, fmt.Errorf("%w... Error while adding the page  Header", err)
+		return PageHeader{}, PagerError("MakePageZero", ErrDbWriteError, fmt.Errorf("%w", err))
 	}
 	return page, nil
 
@@ -79,22 +78,22 @@ func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 // Features like  addcell at index and change its leftPointer
 func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error {
 	defer page.UpdatePageHeader()
-	// if page.PageId != uint16(BufData.PageNum) {
-	err := LoadPage(uint(page.PageId))
-	if err != nil {
-		return err
+	if page.PageId != uint16(BufData.PageNum) {
+		err := LoadPage(uint(page.PageId))
+		if err != nil {
+			return err
+		}
 	}
-	// }
 
 	cellSize := len(cellContent)
-	var cell Cell
-
-	cell.Header.cellLoc = page.freeEnd
-	cell.Header.isOverflow = false
+	cell := Cell{
+		Header: CellHeader{
+			cellLoc:    page.freeEnd,
+			isOverflow: false,
+		},
+	}
 	cellSize += int(CELL_HEAD_SIZE)
-
-	// TODO: check if cell size is max size then make overflow page or new page for it
-	if cellSize > int(page.checkUsableSpace()) && cellSize < int(page.totalFree) {
+	if cellSize > page.checkUsableSpace() && cellSize < int(page.totalFree) {
 		err := page.Defragment()
 		if err != nil {
 			return err
@@ -102,6 +101,7 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 
 	}
 	if cellSize > int(page.checkUsableSpace()) && cellSize > int(MINCELLSIZE) {
+		// TODO: make a new Function handle overFlow cell
 		oflcell := page.makeOverflowCell(cellContent)
 		cell.CellContent = oflcell.serializeOverflow()
 		cell.Header.isOverflow = true
@@ -109,51 +109,54 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 
 		err := LoadPage(uint(page.PageId))
 		if err != nil {
-			return fmt.Errorf("error while Loading the page | %w", err)
+			return PagerError("Addcell", ErrLoadPage, err)
 		}
 
 	} else {
 		cell.CellContent = cellContent
 		cell.Header.cellSize = uint16(len(cell.CellContent))
 	}
-
 	if len(opt) > 0 && opt[0].LeftPointer != nil {
 		cell.Header.LeftChild = *opt[0].LeftPointer
+
+	}
+	cellSer, n := cell.Header.serializeCell(cell.CellContent)
+	if page.freeEnd < page.freeStart {
+		if err := page.Defragment(); err != nil {
+			return PagerError("Addcell", ErrDefragmentation, err)
+		}
 	}
 
-	cellSer, n := cell.Header.serializeCell(cell.CellContent)
-	no := copy(BufData.Data[page.freeEnd-uint16(n):page.freeEnd], cellSer.Bytes())
-	page.freeEnd -= uint16(no)
+	copySize := copy(BufData.Data[page.freeEnd-uint16(n):page.freeEnd], cellSer.Bytes())
+	page.freeEnd -= uint16(copySize)
 	if len(opt) > 0 && opt[0].Index != nil {
 		page.InsertSlot(*opt[0].Index, page.freeEnd)
 	} else {
 		binary.BigEndian.PutUint16(BufData.Data[page.freeStart:page.freeStart+2], page.freeEnd)
 	}
+
 	page.freeStart += uint16(SLOT_SIZE)
-	// BUG: add cell total free
-	page.totalFree -= uint16(no + int(SLOT_SIZE)) // +2
+	page.totalFree -= uint16(copySize + int(SLOT_SIZE)) // +2
 	page.NumSlots += 1
 
 	return nil
 
 }
 
+// Only removes the Slot which is 2 bytes from the slot array
 func (page *PageHeader) RemoveCell(idx uint) error {
 	defer page.UpdatePageHeader()
 	if page.PageId != uint16(BufData.PageNum) {
 		if err := LoadPage(uint(page.PageId)); err != nil {
-			return err
+			return PagerError("RemoveCell", ErrLoadPage, err)
 		}
 	}
-	// do a page load here
 	if idx > uint(page.NumSlots)-1 {
-		return fmt.Errorf("error while removing cell | index is greater than the max slots... ")
+		return PagerError("RemoveCell", ErrCellRemoveError, fmt.Errorf("index is greater than max slots"))
 	}
-	// FIXME: do the error checking for the func getcell
 	oldCell, _ := page.GetCell(idx)
 	page.totalFree += oldCell.Header.cellSize
 	page.totalFree += uint16(CELL_HEAD_SIZE)
-	// BUG: there is bug while shifting slots
 	page.ShiftSlots(idx)
 	page.freeStart -= 2
 	page.NumSlots -= 1
@@ -162,24 +165,34 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 	return nil
 }
 
+// TODO: can make it here as well use read
 func (page *PageHeader) GetCell(idx uint) (Cell, error) {
-	if page.PageId != uint16(BufData.PageNum) {
-		newPage, err := GetPage(uint(page.PageId))
-		if err != nil {
-			return Cell{}, err
-		}
-		return newPage.GetCell(idx)
-	}
 	if page.NumSlots <= uint16(idx) {
-		return Cell{}, fmt.Errorf("index not found in the page %d", idx)
+		return Cell{}, PagerError("GetCell", ErrInvalidIndex, fmt.Errorf("index larger than total slots in page."))
+	}
+	pageData := make([]byte, Init.PAGE_SIZE)
+	pageoffset := Init.PAGE_SIZE * int(page.PageId)
+	n, err := Init.Dbfile.ReadAt(pageData, int64(pageoffset))
+	if err != nil {
+		return Cell{}, err
 	}
 	slotIndex := PAGEHEAD_SIZE + idx*2
-	offset := BufData.Data[slotIndex : slotIndex+2]
+	offset := pageData[slotIndex : slotIndex+2]
 	offsetVal := binary.BigEndian.Uint16(offset)
+	if offsetVal > uint16(Init.PAGE_SIZE) {
+		return Cell{}, PagerError("GetCell", ErrOther, fmt.Errorf("offset value is greater than the pagesize got=%d", offsetVal))
+	}
 	var cell Cell
 	cellHeaderSize := CELL_HEAD_SIZE
-	cell.deserializeCell(BufData.Data[offsetVal : offsetVal+uint16(cellHeaderSize)+1])
-	cell.CellContent = BufData.Data[offsetVal+uint16(cellHeaderSize) : offsetVal+uint16(cellHeaderSize)+cell.Header.cellSize]
+	err = cell.deserializeCell(pageData[offsetVal : offsetVal+uint16(cellHeaderSize)+1])
+	if err != nil {
+		newdesPage := deserializePageHeader(pageData)
+		// For debugging
+		fmt.Printf("%+v is old page new page is %+v", page, newdesPage)
+		fmt.Printf("%q id %d total %d  %x\n\n", err, page.PageId, Init.TOTAL_PAGES, pageData)
+		fmt.Println("read b is ", n)
+	}
+	cell.CellContent = pageData[offsetVal+uint16(cellHeaderSize) : offsetVal+uint16(cellHeaderSize)+cell.Header.cellSize]
 	if cell.Header.isOverflow {
 		pageOffset := cell.CellContent[len(cell.CellContent)-4:]
 		ovPage := binary.BigEndian.Uint32(pageOffset)
@@ -199,33 +212,44 @@ func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 
 }
 
+// use db read here
 func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
 	if offset > 4096 {
 		return Cell{}
 	}
-	LoadPage(uint(page.PageId))
+	// LoadPage(uint(page.PageId))
+	pageData := make([]byte, Init.PAGE_SIZE)
+	pageoffset := Init.PAGE_SIZE * int(page.PageId)
+	_, err := Init.Dbfile.ReadAt(pageData, int64(pageoffset))
+	if err != nil {
+		return Cell{}
+	}
 	var cell Cell
 	cellHeaderSize := CELL_HEAD_SIZE
-	cell.deserializeCell(BufData.Data[offset : offset+uint16(cellHeaderSize)+1])
-	cell.CellContent = BufData.Data[offset+uint16(cellHeaderSize) : offset+uint16(cellHeaderSize)+cell.Header.cellSize]
+	cell.deserializeCell(pageData[offset : offset+uint16(cellHeaderSize)+1])
+	cell.CellContent = pageData[offset+uint16(cellHeaderSize) : offset+uint16(cellHeaderSize)+cell.Header.cellSize]
 	return cell
 
 }
 
+// Defragement uses the uses the binary heap for
+//
+// # Shifting slots to the right of the page removing all the
+//
+// unused spaces
 func (page *PageHeader) Defragment() error {
 	defer page.UpdatePageHeader()
 
 	slotarray := page.SlotArray()
 	binheap := coreAlgo.Heap[uint16]{}
-	destPointer := uint16(4096)
-	// HACK: did some changes here
+	destPointer := uint16(Init.PAGE_SIZE)
 	for k := range slotarray {
 		binheap.Add(k)
 	}
 	for i := 0; i < int(page.NumSlots); i++ {
 		offset, err := binheap.Remove()
 		if err != nil {
-			return fmt.Errorf(" %w Error while removing the element from binheap", err)
+			return PagerError("Defragement", ErrDefragmentation, fmt.Errorf("error while removing element %w", err))
 		}
 		newCell := page.GetCellByOffset(offset)
 		cellSer, n := newCell.Header.serializeCell(newCell.CellContent)
@@ -298,7 +322,7 @@ func ReadOverFlowPageHeader(pageNo uint) (*OverflowPageHeader, error) {
 	var overflowHeader OverflowPageHeader
 	_, err := Init.Dbfile.ReadAt(ovHeader, int64(pageNo-1)*int64(Init.PAGE_SIZE))
 	if err != nil {
-		return nil, fmt.Errorf("%w | error while Reading from the overflow page Header", err)
+		return nil, PagerError("ReadOverflowPage", ErrOther, fmt.Errorf("error while reading overflowpage header  %w ", err))
 
 	}
 	overflowHeader.next = binary.BigEndian.Uint16(ovHeader[:2])
@@ -312,13 +336,13 @@ func (ovHeader *OverflowPageHeader) ReadOverflowPage(pageNo uint) ([]byte, error
 	contents := make([]byte, size+4)
 	_, err := Init.Dbfile.ReadAt(contents, int64(pageNo-1)*int64(Init.PAGE_SIZE))
 	if err != nil {
-		return nil, fmt.Errorf("%w | error while Reading from the overflow page", err)
+		return nil, PagerError("ReadOverflowPage", ErrOther, fmt.Errorf("error while reading overflowpage header %w ", err))
 
 	}
 	if ovHeader.next != 0 {
 		newOverflowHeader, err := ReadOverFlowPageHeader(uint(ovHeader.next))
 		if err != nil {
-			return nil, fmt.Errorf("%w ", err)
+			return nil, PagerError("ReadOverflowPage", ErrOther, fmt.Errorf("%w ", err))
 
 		}
 		newContents, err := newOverflowHeader.ReadOverflowPage(uint(ovHeader.next))

@@ -162,7 +162,7 @@ func TestInsertRemoveInsert(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 10000
+	nkeys := 30000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
@@ -336,7 +336,7 @@ func TestRemoveInsertRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 800
+	nkeys := 10000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}

@@ -1,3 +1,5 @@
+// This package implements the queue data structure
+
 package coreAlgo
 
 import "fmt"

@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 	"syscall"
+
+	"math/rand"
 )
 
 var file *os.File
@@ -24,15 +26,48 @@ func init() {
 }
 
 func main() {
+
 	rnode, err := btree.NewBtreePage()
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 30
-	fmt.Println("=----insert------=")
+	nkeys := 1000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
 	}
+	testkeys := make([]uint64, 0, 200)
+	alltestkeys := make([]uint64, 0, 200)
+
+	for i := 0; i <= nkeys; i++ {
+		testkeys = append(testkeys, uint64(i))
+		alltestkeys = append(alltestkeys, uint64(i))
+	}
+
+	rng := rand.NewSource(987234)
+	src := rand.New(rng)
+	remkeys := make([]uint64, 0, 100)
+	for i := 1; i <= nkeys; i++ {
+		n := src.Int63n(int64(len(testkeys)))
+		fmt.Println("removing", testkeys[uint64(n)])
+		if testkeys[uint64(n)] == 506 {
+			break
+		}
+		btree.Remove(testkeys[uint64(n)])
+		remkeys = append(remkeys, testkeys[uint64(n)])
+		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
+
+	}
+	btree.Remove(506)
+
+	// rnode, err := btree.NewBtreePage()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// nkeys := 99
+	// fmt.Println("=----insert------=")
+	// for i := 1; i <= nkeys; i++ {
+	// 	rnode.Insert(uint64(i))
+	// }
 	// testkeys := make([]uint64, 0, 200)
 	// alltestkeys := make([]uint64, 0, 200)
 
