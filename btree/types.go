@@ -9,7 +9,9 @@ type BtreePage struct {
 type NodeComponent struct {
 	// key         uint64
 	// using key directly as bytes
+	// VAL: here
 	key         []byte
+	val         []byte
 	LeftPointer uint16
 }
 

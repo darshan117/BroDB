@@ -63,7 +63,7 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 	if err != nil {
 		return nil, nil, isbalanced
 	}
-	parentslot, parentid, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
+	parentslot, parentid, err := GetParent(binary.BigEndian.Uint32(firstcell.CellContent[:4]))
 	if err != nil {
 		fmt.Println("error from the shuffle get parent", err)
 		return
@@ -79,12 +79,16 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 		return
 	}
 	parentkeyPair := NodeComponent{
-		key:         parentcell.CellContent,
+		key: parentcell.CellContent[:4],
+		// VAL: here
 		LeftPointer: parentcell.Header.LeftChild,
 	}
 	allKeys = append(allKeys, parentkeyPair)
 	rightkeypairs := rightsib.GetkeysWithPointer()
 	allKeys = append(allKeys, rightkeypairs...)
+	defer func() {
+		allKeys = nil
+	}()
 
 	if len(allKeys) >= 2*NODEFULL {
 		return
@@ -93,16 +97,15 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 	midPoint := len(allKeys) / 2
 	midkey := allKeys[midPoint]
 	keysToBeAdjusted := math.Abs(float64(midPoint) - float64(len(leftkeypairs)))
-	if binary.BigEndian.Uint64(midkey.key) == binary.BigEndian.Uint64(parentkeyPair.key) {
+	if binary.BigEndian.Uint32(midkey.key) == binary.BigEndian.Uint32(parentkeyPair.key) {
 		return
 	}
-	// fmt.Println("key to be ", keysToBeAdjusted, "mid point is ", midPoint, allKeys)
 	if midPoint > len(leftkeypairs) {
 		for i := 0; i < int(keysToBeAdjusted); i++ {
-			leftsib.AddCell(parentcell.CellContent, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
+			leftsib.AddCell(parentcell.CellContent[:4], pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
 			rightfirstCell, _ := rightsib.GetCell(0)
 			leftsib.RightPointer = uint16(rightfirstCell.Header.LeftChild)
-			parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(rightfirstCell.CellContent), parentcell.Header.LeftChild)
+			parent.ReplaceCell(&parentcell, binary.BigEndian.Uint32(rightfirstCell.CellContent[:4]), parentcell.Header.LeftChild)
 			rightsib.RemoveCell(0)
 
 		}
@@ -110,8 +113,8 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 	} else {
 		for i := 0; i < int(keysToBeAdjusted); i++ {
 			leftlastcell, _ := leftsib.GetCell(uint(leftsib.NumSlots) - 1)
-			rightsib.Insertkey(binary.BigEndian.Uint64(parentcell.CellContent), leftsib.RightPointer) //, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
-			parent.ReplaceCell(&parentcell, binary.BigEndian.Uint64(leftlastcell.CellContent), parentcell.Header.LeftChild)
+			rightsib.Insertkey(binary.BigEndian.Uint32(parentcell.CellContent[:4]), leftsib.RightPointer) //, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
+			parent.ReplaceCell(&parentcell, binary.BigEndian.Uint32(leftlastcell.CellContent[:4]), parentcell.Header.LeftChild)
 			leftsib.RightPointer = leftlastcell.Header.LeftChild
 			leftsib.UpdatePageHeader()
 			leftsib.RemoveCell(uint(leftsib.NumSlots) - 1)
@@ -133,7 +136,7 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting the first cell  %w", err)
 	}
-	leftPage, err := GetLeftPage(firstcell.CellContent)
+	leftPage, err := GetLeftPage(firstcell.CellContent[:4])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -167,7 +170,8 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	return leftPage, rightsib, nil
 }
 
-func GetParent(key uint64) (*uint16, *uint16, error) {
+// FIXME: if we have the key as well as values
+func GetParent(key uint32) (*uint16, *uint16, error) {
 	//
 	rootpage, _ := pager.GetPage(uint(Init.ROOTPAGE))
 	root := BtreePage{*rootpage}
@@ -178,13 +182,16 @@ func GetParent(key uint64) (*uint16, *uint16, error) {
 	return slot, pageid, nil
 
 }
-func (node *BtreePage) NodeParent(key uint64) (*uint16, *uint16, error) {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf[0:], key)
+func (node *BtreePage) NodeParent(key uint32) (*uint16, *uint16, error) {
+	buf := make([]byte, 4)
+	defer func() {
+		buf = nil
+	}()
+	binary.BigEndian.PutUint32(buf[0:], key)
 	for i, val := range node.GetSlots() {
 		cell := node.GetCellByOffset(val)
 		// fmt.Println(cell.CellContent)
-		res := binary.BigEndian.Uint64(cell.CellContent)
+		res := binary.BigEndian.Uint32(cell.CellContent[:4])
 		if res == key {
 			slot := uint16(i)
 			return &slot, &node.PageId, nil
@@ -219,11 +226,11 @@ func (node *BtreePage) NodeParent(key uint64) (*uint16, *uint16, error) {
 
 }
 
-func (node *BtreePage) keyIsPresent(key uint64) bool {
+func (node *BtreePage) keyIsPresent(key uint32) bool {
 	for _, val := range node.GetSlots() {
 		// FIXME: can do the binary search here
 		cell := node.GetCellByOffset(val)
-		res := binary.BigEndian.Uint64(cell.CellContent)
+		res := binary.BigEndian.Uint32(cell.CellContent[:4])
 		if res == key {
 			return true
 		}
@@ -236,7 +243,7 @@ func (node *BtreePage) RightSiblingCount() (*BtreePage, error) {
 	if err != nil {
 		return nil, err
 	}
-	parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
+	parentslot, parentId, err := GetParent(binary.BigEndian.Uint32(firstcell.CellContent[:4]))
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +275,7 @@ func (node *BtreePage) RightSiblingCount() (*BtreePage, error) {
 }
 
 func GetLeftPage(key []byte) (*BtreePage, error) {
-	parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(key))
+	parentslot, parentId, err := GetParent(binary.BigEndian.Uint32(key))
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +301,7 @@ func (node *BtreePage) LeftSiblingCount() (*BtreePage, error) {
 	if err != nil {
 		return nil, err
 	}
-	parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
+	parentslot, parentId, err := GetParent(binary.BigEndian.Uint32(firstcell.CellContent[:4]))
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +309,7 @@ func (node *BtreePage) LeftSiblingCount() (*BtreePage, error) {
 	if err != nil {
 		return nil, err
 	}
-	if rightPage, _ := pager.GetPage(uint(parentPage.RightPointer)); (&BtreePage{*rightPage}).keyIsPresent(binary.BigEndian.Uint64(firstcell.CellContent)) {
+	if rightPage, _ := pager.GetPage(uint(parentPage.RightPointer)); (&BtreePage{*rightPage}).keyIsPresent(binary.BigEndian.Uint32(firstcell.CellContent[:4])) {
 		parentCell, err := parentPage.GetCell(uint(*parentslot))
 		if err != nil {
 			return nil, err
@@ -337,22 +344,14 @@ func (node *BtreePage) GetkeysWithPointer() []NodeComponent {
 	for i := 0; i < int(node.NumSlots)-1; i++ {
 		cell, _ := node.GetCell(uint(i))
 		keyContent := make([]byte, len(cell.CellContent))
-		copy(keyContent, cell.CellContent)
+		copy(keyContent, cell.CellContent[:4])
 		keyPairs = append(keyPairs, NodeComponent{
-			key:         keyContent,
+			key: keyContent,
+			// VAL: here
 			LeftPointer: cell.Header.LeftChild,
 		})
 
 	}
-	// for _, v := range node.GetSlots() {
-	// 	cell := node.GetCellByOffset(v)
-	// 	keyContent := make([]byte, len(cell.CellContent))
-	// 	copy(keyContent, cell.CellContent)
-	// 	keyPairs = append(keyPairs, NodeComponent{
-	// 		key:         keyContent,
-	// 		LeftPointer: cell.Header.LeftChild,
-	// 	})
-	// }
 	return keyPairs
 
 }
@@ -372,14 +371,14 @@ func (node *BtreePage) MergeNodes() error {
 				log.Fatal("page head sizei is greter than offset ", k)
 			}
 			cell := leftNode.GetCellByOffset(k)
-			res := binary.BigEndian.Uint64(cell.CellContent)
+			res := binary.BigEndian.Uint32(cell.CellContent[:4])
 			rightNode.Insertkey(res, cell.Header.LeftChild)
 		}
 		firstcell, err := node.GetCell(0)
 		if err != nil {
 			return err
 		}
-		parentslot, parentId, err := GetParent(binary.BigEndian.Uint64(firstcell.CellContent))
+		parentslot, parentId, err := GetParent(binary.BigEndian.Uint32(firstcell.CellContent[:4]))
 		if err != nil {
 			return err
 		}
@@ -410,7 +409,7 @@ func (node *BtreePage) MergeNodes() error {
 		}
 		leftNode.RemoveRange(0, uint(leftNode.NumSlots))
 		pager.MakeFreelistPage(leftNode.PageId)
-		rightNode.Insertkey(binary.BigEndian.Uint64(parentCell.CellContent), leftNode.RightPointer)
+		rightNode.Insertkey(binary.BigEndian.Uint32(parentCell.CellContent[:4]), leftNode.RightPointer)
 
 		parentPage.RemoveCell(uint(*parentslot))
 		parentPage.UpdatePageHeader()

@@ -7,17 +7,21 @@ import (
 	"fmt"
 )
 
-func (tree *BtreePage) search(key uint64) (uint16, uint16, error) {
+func (tree *BtreePage) search(key uint32) (uint16, uint16, error) {
 	if pager.BufData.PageNum != uint(tree.PageId) {
 		pager.GetPage(uint(tree.PageId))
 	}
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf[0:], key)
+	buf := make([]byte, 4)
+	defer func() {
+		buf = nil
+	}()
+	binary.BigEndian.PutUint32(buf[0:], key)
 	if tree.PageType == pager.LEAF {
 		for i, val := range tree.GetSlots() {
-			// can do the binary search here
+			// FIXME: can do the binary search here
 			cell := tree.GetCellByOffset(val)
-			res := binary.BigEndian.Uint64(cell.CellContent)
+			// VAL: here
+			res := binary.BigEndian.Uint32(cell.CellContent[:4])
 			if res == key {
 				return uint16(i), tree.PageId, nil
 			}
@@ -28,7 +32,8 @@ func (tree *BtreePage) search(key uint64) (uint16, uint16, error) {
 	for i, val := range tree.GetSlots() {
 		// can do the binary search here
 		cell := tree.GetCellByOffset(val)
-		res := binary.BigEndian.Uint64(cell.CellContent)
+		// VAL: here
+		res := binary.BigEndian.Uint32(cell.CellContent[:4])
 		if res == key {
 			return uint16(i), tree.PageId, nil
 		} else if res > key {
@@ -53,7 +58,7 @@ func (tree *BtreePage) search(key uint64) (uint16, uint16, error) {
 }
 
 // can make it pointer to the uint16
-func Search(key uint64) (slot uint16, pageid uint16, err error) {
+func Search(key uint32) (slot uint16, pageid uint16, err error) {
 	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
 	if err != nil {
 		return 0, 0, fmt.Errorf("error while insert to the btree %w", err)

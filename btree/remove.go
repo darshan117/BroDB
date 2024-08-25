@@ -48,7 +48,7 @@ func (node *BtreePage) remove(slot uint) error {
 			fmt.Println(err)
 			return err
 		}
-		node.ReplaceCell(&keyCell, binary.BigEndian.Uint64(rightChildCell.CellContent), leftPointer)
+		node.ReplaceCell(&keyCell, binary.BigEndian.Uint32(rightChildCell.CellContent[:4]), leftPointer)
 		if err := pageid.RemoveCell(uint(pageid.NumSlots) - 1); err != nil {
 			fmt.Println(err)
 			return err
@@ -66,7 +66,7 @@ func (node *BtreePage) remove(slot uint) error {
 	return nil
 }
 
-func Remove(key uint64) error {
+func Remove(key uint32) error {
 	slot, pageId, err := Search(key)
 	if err != nil {
 		return err

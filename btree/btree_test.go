@@ -41,9 +41,9 @@ func TestInsert(t *testing.T) {
 		log.Fatal(err)
 	}
 	for i := 0; i <= 1002; i++ {
-		randval := uint64(rand.Int63n(1000000))
+		randval := uint32(rand.Int63n(1000000))
 
-		rnode.Insert(uint64(randval))
+		rnode.Insert(uint32(randval))
 		tree.Insert(uint(randval))
 	}
 	disktree, err := btree.BtreeTraversal()
@@ -64,7 +64,7 @@ func TestParent(t *testing.T) {
 		log.Fatal(err)
 	}
 	for i := 1000; i > 0; i -= 2 {
-		rnode.Insert(uint64(i))
+		rnode.Insert(uint32(i))
 		runtime.GC()
 	}
 	disktree, err := btree.BtreeTraversal()
@@ -72,7 +72,7 @@ func TestParent(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Printf("%+v\n", disktree)
-	rnode.Insert(uint64(0))
+	rnode.Insert(uint32(0))
 	_, err = btree.BtreeTraversal()
 	if err != nil {
 		t.Error(err)
@@ -96,9 +96,9 @@ func BenchmarkInsert(b *testing.B) {
 	}
 	root := btree.BtreePage{*r}
 	for i := 1; i <= b.N; i++ {
-		randval := uint64(rand.Int63n(10000))
+		randval := uint32(rand.Int63n(10000))
 
-		root.Insert(uint64(randval))
+		root.Insert(uint32(randval))
 		tree.Insert(uint(randval))
 	}
 	disktree, err := btree.BtreeTraversal()
@@ -124,11 +124,11 @@ func TestBalancedInsert(t *testing.T) {
 	}
 	nkeys := 100000
 	for i := 0; i <= nkeys; i++ {
-		rnode.Insert(uint64(i))
+		rnode.Insert(uint32(i))
 	}
-	testkeys := make([]uint64, 0, nkeys)
+	testkeys := make([]uint32, 0, nkeys)
 	for i := 0; i <= nkeys; i++ {
-		testkeys = append(testkeys, uint64(i))
+		testkeys = append(testkeys, uint32(i))
 	}
 	btree.BtreeTraversal()
 	allkeys, err := btree.BtreeDFSTraversal()
@@ -143,7 +143,7 @@ func TestBalancedInsert(t *testing.T) {
 		`, testkeys, allkeys)
 	}
 }
-func removekeyFromarray(keys []uint64, element uint64) []uint64 {
+func removekeyFromarray(keys []uint32, element uint32) []uint32 {
 	for i, v := range keys {
 		if v == element {
 			keys = append(keys[:i], keys[i+1:]...)
@@ -165,14 +165,14 @@ func TestInsertRemoveInsert(t *testing.T) {
 	nkeys := 50000
 	for i := 0; i <= nkeys; i++ {
 		fmt.Println("inserting ", i)
-		rnode.Insert(uint64(i))
+		rnode.Insert(uint32(i))
 	}
-	testkeys := make([]uint64, 0, 200)
-	alltestkeys := make([]uint64, 0, 200)
+	testkeys := make([]uint32, 0, 200)
+	alltestkeys := make([]uint32, 0, 200)
 
 	for i := 0; i <= nkeys; i++ {
-		testkeys = append(testkeys, uint64(i))
-		alltestkeys = append(alltestkeys, uint64(i))
+		testkeys = append(testkeys, uint32(i))
+		alltestkeys = append(alltestkeys, uint32(i))
 	}
 	err = checktraversal()
 	if err != nil {
@@ -180,16 +180,16 @@ func TestInsertRemoveInsert(t *testing.T) {
 	}
 	rng := rand.NewSource(987234)
 	src := rand.New(rng)
-	remkeys := make([]uint64, 0, 100)
+	remkeys := make([]uint32, 0, 100)
 	for i := 1; i <= nkeys; i++ {
 		n := src.Int63n(int64(len(testkeys)))
-		fmt.Println("removing", testkeys[uint64(n)])
-		// if testkeys[uint64(n)] == 10093 {
+		fmt.Println("removing", testkeys[uint32(n)])
+		// if testkeys[uint32(n)] == 10093 {
 		// 	break
 		// }
-		btree.Remove(testkeys[uint64(n)])
-		remkeys = append(remkeys, testkeys[uint64(n)])
-		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
+		btree.Remove(testkeys[uint32(n)])
+		remkeys = append(remkeys, testkeys[uint32(n)])
+		testkeys = removekeyFromarray(testkeys, testkeys[uint32(n)])
 
 	}
 	for _, v := range remkeys {
@@ -218,20 +218,20 @@ func TestRemoveOnly(t *testing.T) {
 	// Initialize()
 	nkeys := 500
 
-	testkeys := make([]uint64, 0, 200)
-	alltestkeys := make([]uint64, 0, 200)
+	testkeys := make([]uint32, 0, 200)
+	alltestkeys := make([]uint32, 0, 200)
 
 	for i := 0; i <= nkeys; i++ {
-		testkeys = append(testkeys, uint64(i))
-		alltestkeys = append(alltestkeys, uint64(i))
+		testkeys = append(testkeys, uint32(i))
+		alltestkeys = append(alltestkeys, uint32(i))
 	}
 
 	rng := rand.NewSource(3927347)
 	src := rand.New(rng)
 	for i := 1; i <= nkeys; i++ {
 		n := src.Int63n(int64(len(testkeys)))
-		btree.Remove(testkeys[uint64(n)])
-		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
+		btree.Remove(testkeys[uint32(n)])
+		testkeys = removekeyFromarray(testkeys, testkeys[uint32(n)])
 
 	}
 	allkeys, err := btree.BtreeDFSTraversal()
@@ -253,36 +253,39 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 15000
-	for i := 0; i <= nkeys; i++ {
-		rnode.Insert(uint64(i))
-	}
-	testkeys := make([]uint64, 0, 200)
-	alltestkeys := make([]uint64, 0, 200)
+	for i := 0; i <= 200; i++ {
+		nkeys := 1500
+		for i := 0; i <= nkeys; i++ {
+			rnode.Insert(uint32(i))
+		}
+		testkeys := make([]uint32, 0, 200)
+		alltestkeys := make([]uint32, 0, 200)
 
-	for i := 0; i <= nkeys; i++ {
-		testkeys = append(testkeys, uint64(i))
-		alltestkeys = append(alltestkeys, uint64(i))
-	}
+		for i := 0; i <= nkeys; i++ {
+			testkeys = append(testkeys, uint32(i))
+			alltestkeys = append(alltestkeys, uint32(i))
+		}
 
-	rng := rand.NewSource(3927347)
-	src := rand.New(rng)
-	for i := 1; i <= nkeys; i++ {
-		n := src.Int63n(int64(len(testkeys)))
-		btree.Remove(testkeys[uint64(n)])
-		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
+		rng := rand.NewSource(3927347)
+		src := rand.New(rng)
+		for i := 0; i <= nkeys; i++ {
+			n := src.Int63n(int64(len(testkeys)))
+			btree.Remove(testkeys[uint32(n)])
+			testkeys = removekeyFromarray(testkeys, testkeys[uint32(n)])
 
-	}
-	allkeys, err := btree.BtreeDFSTraversal()
-	if err != nil {
-		t.Error(err)
-	}
-	if !reflect.DeepEqual(allkeys, testkeys) {
-		t.Errorf(
-			`
+		}
+		allkeys, err := btree.BtreeDFSTraversal()
+		if err != nil {
+			t.Error(err)
+		}
+		if !reflect.DeepEqual(allkeys, testkeys) {
+			t.Errorf(
+				`
 		expected:%v,
 		got:%v
 		`, testkeys, allkeys)
+		}
+
 	}
 }
 func BenchmarkInsertRemoveInsert(t *testing.B) {
@@ -296,25 +299,25 @@ func BenchmarkInsertRemoveInsert(t *testing.B) {
 	}
 	nkeys := t.N
 	for i := 0; i <= nkeys; i++ {
-		rnode.Insert(uint64(i))
+		rnode.Insert(uint32(i))
 	}
-	testkeys := make([]uint64, 0, 200)
-	alltestkeys := make([]uint64, 0, 200)
+	testkeys := make([]uint32, 0, 200)
+	alltestkeys := make([]uint32, 0, 200)
 
 	for i := 0; i <= nkeys; i++ {
-		testkeys = append(testkeys, uint64(i))
-		alltestkeys = append(alltestkeys, uint64(i))
+		testkeys = append(testkeys, uint32(i))
+		alltestkeys = append(alltestkeys, uint32(i))
 	}
 
 	rng := rand.NewSource(98753)
 	src := rand.New(rng)
-	remkeys := make([]uint64, 0, 100)
+	remkeys := make([]uint32, 0, 100)
 	btree.BtreeTraversal()
 	for i := 1; i <= nkeys; i++ {
 		n := src.Int63n(int64(len(testkeys)))
-		fmt.Print(btree.Remove(testkeys[uint64(n)]))
-		remkeys = append(remkeys, testkeys[uint64(n)])
-		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
+		fmt.Print(btree.Remove(testkeys[uint32(n)]))
+		remkeys = append(remkeys, testkeys[uint32(n)])
+		testkeys = removekeyFromarray(testkeys, testkeys[uint32(n)])
 
 	}
 	for _, v := range remkeys {
@@ -347,28 +350,28 @@ func TestRemoveInsertRemove(t *testing.T) {
 	}
 	nkeys := 35000
 	for i := 0; i <= nkeys; i++ {
-		rnode.Insert(uint64(i))
+		rnode.Insert(uint32(i))
 	}
 	err = checktraversal()
 	if err != nil {
 		t.Fatal(err)
 	}
-	testkeys := make([]uint64, 0, 200)
-	alltestkeys := make([]uint64, 0, 200)
+	testkeys := make([]uint32, 0, 200)
+	alltestkeys := make([]uint32, 0, 200)
 
 	for i := 0; i <= nkeys; i++ {
-		testkeys = append(testkeys, uint64(i))
-		alltestkeys = append(alltestkeys, uint64(i))
+		testkeys = append(testkeys, uint32(i))
+		alltestkeys = append(alltestkeys, uint32(i))
 	}
 
 	rng := rand.NewSource(234709871)
 	src := rand.New(rng)
-	remkeys := make([]uint64, 0, 100)
+	remkeys := make([]uint32, 0, 100)
 	for i := 1; i <= nkeys; i++ {
 		n := src.Int63n(int64(len(testkeys)))
-		btree.Remove(testkeys[uint64(n)])
-		remkeys = append(remkeys, testkeys[uint64(n)])
-		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
+		btree.Remove(testkeys[uint32(n)])
+		remkeys = append(remkeys, testkeys[uint32(n)])
+		testkeys = removekeyFromarray(testkeys, testkeys[uint32(n)])
 
 	}
 	for _, v := range remkeys {
@@ -424,11 +427,11 @@ func TestSearch(t *testing.T) {
 		log.Fatal(err)
 	}
 	for i := 0; i <= 1000; i++ {
-		rnode.Insert(uint64(i))
+		rnode.Insert(uint32(i))
 		tree.Insert(uint(i))
 	}
 	for i := 0; i <= 10000; i++ {
-		randval := uint64(rand.Int63n(1000))
+		randval := uint32(rand.Int63n(1000))
 		node, err := tree.Search(uint(randval))
 		if err != nil {
 			log.Fatal(err)
@@ -456,7 +459,7 @@ func TestUnmap(t *testing.T) {
 		log.Fatal(err)
 	}
 	for i := 0; i <= 10; i++ {
-		rnode.Insert(uint64(i))
+		rnode.Insert(uint32(i))
 		tree.Insert(uint(i))
 	}
 

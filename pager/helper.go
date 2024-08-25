@@ -60,17 +60,18 @@ func (page *PageHeader) UpdatePageHeader() error {
 }
 
 // Replaces only the cell content and its leftpointers
-func (page *PageHeader) ReplaceCell(cell *Cell, key uint64, leftPointer uint16) {
+func (page *PageHeader) ReplaceCell(cell *Cell, key uint32, leftPointer uint16) {
+	// VAL: here
 	if page.PageId != uint16(BufData.PageNum) {
 		LoadPage(uint(page.PageId))
 	}
 	// load page while replacing cell
-	res := make([]byte, 8)
-	binary.BigEndian.PutUint64(res[0:], key)
+	res := make([]byte, 4)
+	binary.BigEndian.PutUint32(res[0:], key)
 	cell.CellContent = res
 	cell.Header.LeftChild = leftPointer
 	cellLocation := cell.Header.cellLoc
-	cellSer, n := cell.Header.serializeCell(cell.CellContent)
+	cellSer, n := cell.Header.serializeCell(cell.CellContent[:4])
 	copy(BufData.Data[cellLocation-uint16(n):cellLocation], cellSer.Bytes())
 
 }
@@ -194,9 +195,9 @@ func (page *PageHeader) RemoveRange(start, end uint) error {
 	}
 	copy(BufData.Data[startIndex:], BufData.Data[endIndex:page.freeStart])
 
-	for i := page.freeStart - uint16(endIndex-startIndex); i < page.freeStart; i++ {
-		BufData.Data[i] = 0
-	}
+	// for i := page.freeStart - uint16(endIndex-startIndex); i < page.freeStart; i++ {
+	// 	BufData.Data[i] = 0
+	// }
 
 	page.freeStart -= uint16(endIndex - startIndex)
 	page.NumSlots -= uint16(end - start)
@@ -213,7 +214,8 @@ func (page *PageHeader) SlotArray() map[uint16]PointerList {
 
 	for i := startidx; i < uint(page.freeStart); {
 		var slot PointerList
-		offset := BufData.Data[i : i+2]
+		offset := make([]byte, 2)
+		copy(offset, BufData.Data[i:i+2])
 		offsetVal := binary.BigEndian.Uint16(offset)
 		slot.index = uint16(id)
 		// FIXME:  do the error checking as getcell also returns the error
@@ -226,6 +228,7 @@ func (page *PageHeader) SlotArray() map[uint16]PointerList {
 		slotmap[offsetVal] = slot
 		i += 2
 		id += 1
+		offset = nil
 	}
 	return slotmap
 
@@ -246,12 +249,7 @@ func (page *PageHeader) GetSlots() []uint16 {
 		fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
 		return slots
 	}
-	pageData := make([]byte, Init.PAGE_SIZE)
-	pageoffset := Init.PAGE_SIZE * int(page.PageId)
-	_, err := Init.Dbfile.ReadAt(pageData, int64(pageoffset))
-	if err != nil {
-		return slots
-	}
+	pageData := page.FileRead()
 	for i := startidx; i < uint(page.freeStart); {
 
 		offset := pageData[i : i+2]
@@ -272,7 +270,8 @@ func (page *PageHeader) fixSlot(index uint, offset uint16) {
 }
 
 // returns all the keys of the node
-func (page *PageHeader) GetKeys() []uint64 {
+func (page *PageHeader) GetKeys() []uint32 {
+	// VAL: here
 	if page.PageId != uint16(BufData.PageNum) {
 		// FIXME: do error handling here
 		newPage, err := GetPage(uint(page.PageId))
@@ -281,10 +280,10 @@ func (page *PageHeader) GetKeys() []uint64 {
 		}
 		return newPage.GetKeys()
 	}
-	keys := make([]uint64, 0)
+	keys := make([]uint32, 0)
 	for _, val := range page.GetSlots() {
 		cell := page.GetCellByOffset(val)
-		res := binary.BigEndian.Uint64(cell.CellContent)
+		res := binary.BigEndian.Uint32(cell.CellContent[:4])
 		keys = append(keys, res)
 	}
 	return keys
@@ -360,5 +359,26 @@ func (node *PageHeader) GetrightmostPage() (pageid *PageHeader, err error) {
 		return nil, err
 	}
 	return rightpage.GetrightmostPage()
+
+}
+
+func (page *PageHeader) FileRead() []byte {
+	pageData := make([]byte, Init.PAGE_SIZE)
+	offset := int64(Init.PAGE_SIZE * int(page.PageId))
+	_, err := Init.Dbfile.ReadAt(pageData, offset)
+	if err != nil {
+		// handle this error
+	}
+	return pageData
+
+}
+
+func (page *PageHeader) FileReadAndUpdate(contents []byte, offset int64) {
+	pageData := page.FileRead()
+	_, err := Init.Dbfile.WriteAt(contents, offset)
+	if err != nil {
+		// handle error
+	}
+	fmt.Println(pageData)
 
 }

@@ -192,12 +192,7 @@ func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 	if page.NumSlots <= uint16(idx) {
 		return Cell{}, PagerError("GetCell", ErrInvalidIndex, fmt.Errorf("index larger than total slots in page."))
 	}
-	pageData := make([]byte, Init.PAGE_SIZE)
-	pageoffset := Init.PAGE_SIZE * int(page.PageId)
-	n, err := Init.Dbfile.ReadAt(pageData, int64(pageoffset))
-	if err != nil {
-		return Cell{}, err
-	}
+	pageData := page.FileRead()
 	slotIndex := PAGEHEAD_SIZE + idx*2
 	offset := pageData[slotIndex : slotIndex+2]
 	offsetVal := binary.BigEndian.Uint16(offset)
@@ -206,13 +201,12 @@ func (page *PageHeader) GetCell(idx uint) (Cell, error) {
 	}
 	var cell Cell
 	cellHeaderSize := CELL_HEAD_SIZE
-	err = cell.deserializeCell(pageData[offsetVal : offsetVal+uint16(cellHeaderSize)+1])
+	err := cell.deserializeCell(pageData[offsetVal : offsetVal+uint16(cellHeaderSize)+1])
 	if err != nil {
 		newdesPage := deserializePageHeader(pageData)
 		// For debugging
 		fmt.Printf("%+v is old page new page is %+v", page, newdesPage)
 		fmt.Printf("%q id %d total %d  %x\n\n", err, page.PageId, Init.TOTAL_PAGES, pageData)
-		fmt.Println("read b is ", n)
 	}
 	cell.CellContent = pageData[offsetVal+uint16(cellHeaderSize) : offsetVal+uint16(cellHeaderSize)+cell.Header.cellSize]
 	if cell.Header.isOverflow {
@@ -240,15 +234,10 @@ func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
 		return Cell{}
 	}
 	// LoadPage(uint(page.PageId))
-	pageData := make([]byte, Init.PAGE_SIZE)
-	pageoffset := Init.PAGE_SIZE * int(page.PageId)
-	_, err := Init.Dbfile.ReadAt(pageData, int64(pageoffset))
-	if err != nil {
-		return Cell{}
-	}
+	pageData := page.FileRead()
 	var cell Cell
 	cellHeaderSize := CELL_HEAD_SIZE
-	err = cell.deserializeCell(pageData[offset : offset+uint16(cellHeaderSize)+1])
+	cell.deserializeCell(pageData[offset : offset+uint16(cellHeaderSize)+1])
 	cell.CellContent = pageData[offset+uint16(cellHeaderSize) : offset+uint16(cellHeaderSize)+cell.Header.cellSize]
 	return cell
 
@@ -258,6 +247,7 @@ func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
 // Shifting slots to the right of the page removing all the
 // unused spaces
 func (page *PageHeader) Defragment() error {
+	// can use dbfile.Write here
 	defer page.UpdatePageHeader()
 	LoadPage(uint(page.PageId))
 	slotarray := page.SlotArray()
