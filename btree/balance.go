@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 )
 
@@ -366,8 +367,11 @@ func (node *BtreePage) MergeNodes() error {
 	}
 	if node.PageType == pager.LEAF || node.PageType == pager.INTERIOR {
 		// leftnode is added to the rightnode
-		for _, v := range leftNode.GetSlots() {
-			cell := leftNode.GetCellByOffset(v)
+		for k := range leftNode.SlotArray() {
+			if k < uint16(pager.PAGEHEAD_SIZE) {
+				log.Fatal("page head sizei is greter than offset ", k)
+			}
+			cell := leftNode.GetCellByOffset(k)
 			res := binary.BigEndian.Uint64(cell.CellContent)
 			rightNode.Insertkey(res, cell.Header.LeftChild)
 		}

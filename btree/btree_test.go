@@ -162,8 +162,9 @@ func TestInsertRemoveInsert(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 30000
+	nkeys := 50000
 	for i := 0; i <= nkeys; i++ {
+		fmt.Println("inserting ", i)
 		rnode.Insert(uint64(i))
 	}
 	testkeys := make([]uint64, 0, 200)
@@ -173,19 +174,26 @@ func TestInsertRemoveInsert(t *testing.T) {
 		testkeys = append(testkeys, uint64(i))
 		alltestkeys = append(alltestkeys, uint64(i))
 	}
-
+	err = checktraversal()
+	if err != nil {
+		t.Fatal(err)
+	}
 	rng := rand.NewSource(987234)
 	src := rand.New(rng)
 	remkeys := make([]uint64, 0, 100)
 	for i := 1; i <= nkeys; i++ {
 		n := src.Int63n(int64(len(testkeys)))
 		fmt.Println("removing", testkeys[uint64(n)])
+		// if testkeys[uint64(n)] == 10093 {
+		// 	break
+		// }
 		btree.Remove(testkeys[uint64(n)])
 		remkeys = append(remkeys, testkeys[uint64(n)])
 		testkeys = removekeyFromarray(testkeys, testkeys[uint64(n)])
 
 	}
 	for _, v := range remkeys {
+		fmt.Println("inserting", v)
 		rnode.Insert(v)
 	}
 	if err := checktraversal(); err != nil {
@@ -202,6 +210,7 @@ func TestInsertRemoveInsert(t *testing.T) {
 		expected:%v,
 		got:%v
 		`, alltestkeys, allkeys)
+		checktraversal()
 	}
 }
 func TestRemoveOnly(t *testing.T) {
@@ -336,9 +345,13 @@ func TestRemoveInsertRemove(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nkeys := 10000
+	nkeys := 35000
 	for i := 0; i <= nkeys; i++ {
 		rnode.Insert(uint64(i))
+	}
+	err = checktraversal()
+	if err != nil {
+		t.Fatal(err)
 	}
 	testkeys := make([]uint64, 0, 200)
 	alltestkeys := make([]uint64, 0, 200)
@@ -348,7 +361,7 @@ func TestRemoveInsertRemove(t *testing.T) {
 		alltestkeys = append(alltestkeys, uint64(i))
 	}
 
-	rng := rand.NewSource(987234)
+	rng := rand.NewSource(234709871)
 	src := rand.New(rng)
 	remkeys := make([]uint64, 0, 100)
 	for i := 1; i <= nkeys; i++ {
@@ -362,8 +375,12 @@ func TestRemoveInsertRemove(t *testing.T) {
 		fmt.Println("inserting ", v)
 		rnode.Insert(v)
 	}
-	for _, v := range remkeys {
-		fmt.Println("removing ", v)
+	err = checktraversal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, v := range remkeys {
+		fmt.Println("removing ", v, i)
 		err = btree.Remove(v)
 		if err != nil {
 			t.Error(err)

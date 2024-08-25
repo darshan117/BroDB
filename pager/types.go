@@ -9,6 +9,12 @@ const (
 	ROOT_AND_LEAF
 )
 
+// PageHeader represents a page in the database.
+// It contains the following fields:
+//
+//	PageId: The unique identifier for this page
+//	NumSlots: The number of slots currently in use
+//	Data: The actual data stored in the page
 type PageHeader struct {
 	// FIXME: might need to remove the pageId
 	PageId         uint16
@@ -25,6 +31,8 @@ type OverflowPageHeader struct {
 	next uint16
 	size uint16
 }
+
+// InsertSlot inserts a new slot. See [PageHeader.InsertSlot] for locating slots.
 type OverflowPtr struct {
 	payload []byte
 	ptr     uint32

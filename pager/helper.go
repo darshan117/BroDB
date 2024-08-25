@@ -8,19 +8,7 @@ import (
 	"syscall"
 )
 
-// type PageHeader struct {
-// 	// FIXME: might need to remove the PageId
-// 	PageId         uint8
-// 	PageType       PageType
-// 	freeStart      uint16
-// 	freeEnd        uint16
-// 	totalFree      uint16
-// 	NumSlots       uint16
-// 	lastOffsetUsed uint16
-// 	RightPointer   uint16
-// 	flags          uint8
-// }
-
+// serializing the pageheader fields
 func (page *PageHeader) serializePageHeader(pageHeader []byte) []byte {
 
 	binary.BigEndian.PutUint16(pageHeader[0:], uint16(page.PageId))
@@ -35,6 +23,7 @@ func (page *PageHeader) serializePageHeader(pageHeader []byte) []byte {
 	return pageHeader
 
 }
+
 func deserializePageHeader(pageHeader []byte) PageHeader {
 	var Header PageHeader
 	Header.PageId = binary.BigEndian.Uint16(pageHeader[:2])
@@ -61,8 +50,6 @@ func (page *PageHeader) UpdatePageHeader() error {
 	}
 	pageHeader := make([]byte, PAGEHEAD_SIZE)
 	page.serializePageHeader(pageHeader)
-	// fmt.Println("pageheader is ", pageHeader)
-	// copy(BufData.Data[:PAGEHEAD_SIZE], pageHeader)
 	offset := int64(page.PageId) * int64(Init.PAGE_SIZE)
 	_, err := Init.Dbfile.WriteAt(pageHeader, int64(offset)) // 0 means relative to the origin of the file
 	if err != nil {
@@ -72,6 +59,7 @@ func (page *PageHeader) UpdatePageHeader() error {
 
 }
 
+// Replaces only the cell content and its leftpointers
 func (page *PageHeader) ReplaceCell(cell *Cell, key uint64, leftPointer uint16) {
 	if page.PageId != uint16(BufData.PageNum) {
 		LoadPage(uint(page.PageId))
@@ -130,6 +118,7 @@ func (cell *Cell) deserializeCell(cellHeader []byte) error {
 
 }
 
+// Loads the page to memory using mmap.
 func LoadPage(pageNo uint) error {
 	BufData.PageNum = pageNo
 
@@ -148,11 +137,6 @@ func LoadPage(pageNo uint) error {
 			return uint(remainingSize)
 		}
 		return uint(Init.PAGE_SIZE)
-		// if offset > uint(fileStat.Size()) {
-		// 	fmt.Println("offset is ", offset)
-		// 	return uint(fileStat.Size()) - offset
-		// }
-		// return uint(Init.PAGE_SIZE)
 	}
 	BufData.Data, err = syscall.Mmap(int(Init.Dbfile.Fd()), int64(offset), int(mapSize()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
@@ -174,7 +158,9 @@ func (page *PageHeader) ShiftSlots(idx uint) {
 	}
 	binary.BigEndian.PutUint16(BufData.Data[page.freeStart-2:page.freeStart], uint16(0))
 }
+
 func (page *PageHeader) InsertSlot(idx int, offsetVal uint16) {
+	// LoadPage(uint(page.PageId))
 	if page.NumSlots > 0 {
 		ind := int(page.NumSlots - 1)
 		slotid := PAGEHEAD_SIZE + uint(idx)*2
@@ -197,7 +183,6 @@ func (page *PageHeader) RemoveRange(start, end uint) error {
 
 	startIndex := PAGEHEAD_SIZE + start*2
 	endIndex := PAGEHEAD_SIZE + end*2
-	// remainingBytes := page.freeStart - uint16(endIndex)
 	for i := start; i < end; i++ {
 		oldCell, err := page.GetCell(i)
 		if err != nil {
@@ -206,19 +191,13 @@ func (page *PageHeader) RemoveRange(start, end uint) error {
 		page.totalFree += oldCell.Header.cellSize
 		page.totalFree += uint16(CELL_HEAD_SIZE)
 		page.totalFree += 2 // slot size has
-		// page.freeStart += 2
 	}
-
-	// fmt.Println("before", BufData.Data[:40])
-	// Move the remaining data to fill the gap
 	copy(BufData.Data[startIndex:], BufData.Data[endIndex:page.freeStart])
 
-	// Zero out the now-unused space at the end
 	for i := page.freeStart - uint16(endIndex-startIndex); i < page.freeStart; i++ {
 		BufData.Data[i] = 0
 	}
 
-	// Update freeStart
 	page.freeStart -= uint16(endIndex - startIndex)
 	page.NumSlots -= uint16(end - start)
 	page.UpdatePageHeader()
@@ -228,6 +207,7 @@ func (page *PageHeader) RemoveRange(start, end uint) error {
 // TODO: can use db read here
 func (page *PageHeader) SlotArray() map[uint16]PointerList {
 	var slotmap = make(map[uint16]PointerList)
+	LoadPage(uint(page.PageId))
 	startidx := PAGEHEAD_SIZE // page Header size make it global
 	id := 0
 
@@ -251,17 +231,12 @@ func (page *PageHeader) SlotArray() map[uint16]PointerList {
 
 }
 
-// TODO: db read
-// TODO: error handling here
+// return all slots in a []uint16
 func (page *PageHeader) GetSlots() []uint16 {
-	// if page.PageId != uint16(BufData.PageNum) {
-	// 	newpage, _ := GetPage(uint(page.PageId))
-	// 	return newpage.GetSlots()
-	// }
-	// LoadPage(uint(page.PageId))
 
 	startidx := PAGEHEAD_SIZE
 	slots := make([]uint16, 0)
+	// TODO: better error handling
 	if len(BufData.Data) == 0 {
 		fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
 		if err := LoadPage(uint(page.PageId)); err != nil {
@@ -279,7 +254,6 @@ func (page *PageHeader) GetSlots() []uint16 {
 	}
 	for i := startidx; i < uint(page.freeStart); {
 
-		// offset := BufData.Data[i : i+2]
 		offset := pageData[i : i+2]
 		offsetVal := binary.BigEndian.Uint16(offset)
 		slots = append(slots, offsetVal)
@@ -288,21 +262,28 @@ func (page *PageHeader) GetSlots() []uint16 {
 	return slots
 }
 
+// after Defragmenting all the slots need to be fixed
 func (page *PageHeader) fixSlot(index uint, offset uint16) {
 	slotIndex := PAGEHEAD_SIZE + index*2
+	if offset > uint16(Init.PAGE_SIZE) {
+		fmt.Println("Error fix slot got offset bigger than pagesize", offset, index)
+	}
 	binary.BigEndian.PutUint16(BufData.Data[slotIndex:slotIndex+2], offset)
 }
 
-// TODO: db read here
+// returns all the keys of the node
 func (page *PageHeader) GetKeys() []uint64 {
-	// if page.PageId != uint16(BufData.PageNum) {
-	// FIXME: do error handling here
-	newPage, _ := GetPage(uint(page.PageId))
-	// 	return newPage.GetKeys()
-	// }
+	if page.PageId != uint16(BufData.PageNum) {
+		// FIXME: do error handling here
+		newPage, err := GetPage(uint(page.PageId))
+		if err != nil {
+			PagerError("Getkeys", ErrLoadPage, err)
+		}
+		return newPage.GetKeys()
+	}
 	keys := make([]uint64, 0)
 	for _, val := range page.GetSlots() {
-		cell := newPage.GetCellByOffset(val)
+		cell := page.GetCellByOffset(val)
 		res := binary.BigEndian.Uint64(cell.CellContent)
 		keys = append(keys, res)
 	}
@@ -364,6 +345,9 @@ func (page *PageHeader) UpdateRightPointer(newLoc uint, newpage *PageHeader) err
 	return nil
 }
 
+// This is required for balancing where key is removed from the parent node
+//
+// needs to have left pointers page rightmost child
 func (node *PageHeader) GetrightmostPage() (pageid *PageHeader, err error) {
 	if node.PageType == LEAF {
 		if node.RightPointer != 0 {
@@ -378,8 +362,3 @@ func (node *PageHeader) GetrightmostPage() (pageid *PageHeader, err error) {
 	return rightpage.GetrightmostPage()
 
 }
-
-// func safeCopyMmap(dest,src []byte) error {
-// 	copy(dest,src)
-// 	err := syscall.Mun
-// }

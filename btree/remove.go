@@ -86,6 +86,7 @@ func Remove(key uint64) error {
 		fmt.Println(err)
 		return err
 	}
+
 	// node.Shuffle()
 
 	return nil

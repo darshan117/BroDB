@@ -1,3 +1,23 @@
+// Package pager provides functionality for managing database pages and their contents.
+//
+// The pager is responsible for handling the low-level operations on database pages,
+// including cell management, slot manipulation, and page header updates. It serves
+// as a crucial component in database systems, managing the physical storage and
+// retrieval of data.
+//
+// Key Features:
+//
+//   - Cell Management: Add, remove, and retrieve cells within pages
+//   - Slot Manipulation: Handle slot allocation and deallocation
+//   - Page Header Updates: Modify and maintain page metadata
+//   - Efficient Storage: Optimize space utilization within pages
+//
+// Main Components:
+//
+//   - Pager: The core struct that encapsulates page management operations
+//   - Page: Represents a single database page
+//   - Cell: The basic unit of data storage within a page
+//   - Slot: Represents a location within a page where a cell can be stored
 package pager
 
 import (
@@ -99,6 +119,8 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 			return err
 		}
 
+	} else if cellSize > int(page.totalFree) {
+		return PagerError("Addcell", ErrNoRoom, fmt.Errorf("total free is %d", page.totalFree))
 	}
 	if cellSize > int(page.checkUsableSpace()) && cellSize > int(MINCELLSIZE) {
 		// TODO: make a new Function handle overFlow cell
@@ -121,7 +143,7 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 
 	}
 	cellSer, n := cell.Header.serializeCell(cell.CellContent)
-	if page.freeEnd < page.freeStart {
+	if page.freeEnd-uint16(n) <= page.freeStart+50 { // padding{
 		if err := page.Defragment(); err != nil {
 			return PagerError("Addcell", ErrDefragmentation, err)
 		}
@@ -226,20 +248,18 @@ func (page *PageHeader) GetCellByOffset(offset uint16) Cell {
 	}
 	var cell Cell
 	cellHeaderSize := CELL_HEAD_SIZE
-	cell.deserializeCell(pageData[offset : offset+uint16(cellHeaderSize)+1])
+	err = cell.deserializeCell(pageData[offset : offset+uint16(cellHeaderSize)+1])
 	cell.CellContent = pageData[offset+uint16(cellHeaderSize) : offset+uint16(cellHeaderSize)+cell.Header.cellSize]
 	return cell
 
 }
 
 // Defragement uses the uses the binary heap for
-//
-// # Shifting slots to the right of the page removing all the
-//
+// Shifting slots to the right of the page removing all the
 // unused spaces
 func (page *PageHeader) Defragment() error {
 	defer page.UpdatePageHeader()
-
+	LoadPage(uint(page.PageId))
 	slotarray := page.SlotArray()
 	binheap := coreAlgo.Heap[uint16]{}
 	destPointer := uint16(Init.PAGE_SIZE)
@@ -260,6 +280,7 @@ func (page *PageHeader) Defragment() error {
 	}
 	page.freeEnd = destPointer
 	page.totalFree = page.freeEnd - page.freeStart
+	page.flags = 2
 	return nil
 }
 
@@ -305,13 +326,14 @@ func MakeOverFlowPage(PageNum uint, payload []byte) error {
 	copy(payl[4:], newpayload)
 	_, err := Init.Dbfile.WriteAt(payl, int64(Init.PAGE_SIZE)*int64(PageNum-1))
 	if err != nil {
-		return fmt.Errorf("%w... Error while adding the page  Header", err)
+
+		return PagerError("MakeOverFlowPage", ErrDbWriteError, fmt.Errorf("%w", err))
 	}
 	IncrementTotalPages()
 
 	err = LoadPage(uint(PageNum))
 	if err != nil {
-		return fmt.Errorf("error while Loading the page | %w", err)
+		return PagerError("MakeOverFlowPage", ErrLoadPage, fmt.Errorf("%w", err))
 
 	}
 	return nil
@@ -347,7 +369,7 @@ func (ovHeader *OverflowPageHeader) ReadOverflowPage(pageNo uint) ([]byte, error
 		}
 		newContents, err := newOverflowHeader.ReadOverflowPage(uint(ovHeader.next))
 		if err != nil {
-			return nil, fmt.Errorf("%w ", err)
+			return nil, PagerError("ReadOverflowPage", ErrOther, fmt.Errorf("%w ", err))
 
 		}
 		contents = append(contents, newContents[4:]...)

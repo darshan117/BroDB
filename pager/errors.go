@@ -13,6 +13,7 @@ var (
 	ErrLoadPage        = errors.New("cannot load page")
 	ErrCellRemoveError = errors.New("cannot remove cell")
 	ErrDbWriteError    = errors.New("db write error")
+	ErrNoRoom          = errors.New("no room for new element in the page")
 	ErrOther           = errors.New("other error")
 )
 
@@ -23,7 +24,7 @@ type PageError struct {
 }
 
 func (e *PageError) Error() string {
-	return fmt.Sprintf(" %s: %s: %v", e.FuncName, e.ErrType, e.Err)
+	return fmt.Sprintf(" %s: %v: %v", e.FuncName, e.ErrType, e.Err)
 }
 
 func (e *PageError) Unwrap() error {
