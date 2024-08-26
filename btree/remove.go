@@ -2,7 +2,6 @@ package btree
 
 import (
 	"blackdb/pager"
-	"encoding/binary"
 	"fmt"
 )
 
@@ -24,7 +23,6 @@ func (node *BtreePage) remove(slot uint) error {
 		}
 
 	} else if node.PageType == pager.INTERIOR || node.PageType == pager.ROOTPAGE {
-		// TODO: get node.leftchild could be a helper function
 		keyCell, err := node.GetCell(slot)
 		if err != nil {
 			return err
@@ -48,7 +46,7 @@ func (node *BtreePage) remove(slot uint) error {
 			fmt.Println(err)
 			return err
 		}
-		node.ReplaceCell(&keyCell, binary.BigEndian.Uint32(rightChildCell.CellContent[:4]), leftPointer)
+		node.ReplaceCell(&keyCell, rightChildCell.CellContent, leftPointer)
 		if err := pageid.RemoveCell(uint(pageid.NumSlots) - 1); err != nil {
 			fmt.Println(err)
 			return err
@@ -58,7 +56,6 @@ func (node *BtreePage) remove(slot uint) error {
 		rightchildpage.UpdatePageHeader()
 		node.UpdatePageHeader()
 		leftchildPage.Shuffle()
-		// FIXME:
 		rightchildpage.Shuffle()
 		node.Shuffle()
 	}

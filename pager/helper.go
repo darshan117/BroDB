@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"syscall"
 )
 
@@ -60,18 +61,18 @@ func (page *PageHeader) UpdatePageHeader() error {
 }
 
 // Replaces only the cell content and its leftpointers
-func (page *PageHeader) ReplaceCell(cell *Cell, key uint32, leftPointer uint16) {
+func (page *PageHeader) ReplaceCell(cell *Cell, buf []byte, leftPointer uint16) {
 	// VAL: here
-	if page.PageId != uint16(BufData.PageNum) {
-		LoadPage(uint(page.PageId))
-	}
+	// if page.PageId != uint16(BufData.PageNum) {
+	LoadPage(uint(page.PageId))
+	// }
 	// load page while replacing cell
-	res := make([]byte, 4)
-	binary.BigEndian.PutUint32(res[0:], key)
-	cell.CellContent = res
+	// res := make([]byte, 4)
+	// binary.BigEndian.PutUint32(res[0:], key)
+	cell.CellContent = buf
 	cell.Header.LeftChild = leftPointer
 	cellLocation := cell.Header.cellLoc
-	cellSer, n := cell.Header.serializeCell(cell.CellContent[:4])
+	cellSer, n := cell.Header.serializeCell(cell.CellContent)
 	copy(BufData.Data[cellLocation-uint16(n):cellLocation], cellSer.Bytes())
 
 }
@@ -122,6 +123,9 @@ func (cell *Cell) deserializeCell(cellHeader []byte) error {
 // Loads the page to memory using mmap.
 func LoadPage(pageNo uint) error {
 	BufData.PageNum = pageNo
+	// if pageNo > uint(Init.TOTAL_PAGES) {
+	// 	log.Fatal("got pageNo", pageNo)
+	// }
 
 	fileStat, err := Init.Dbfile.Stat()
 	if err != nil {
@@ -250,10 +254,19 @@ func (page *PageHeader) GetSlots() []uint16 {
 		return slots
 	}
 	pageData := page.FileRead()
+	if page.freeStart > uint16(Init.PAGE_SIZE) {
+
+		fmt.Println(Init.TOTAL_PAGES)
+		log.Fatalf("%+v\n", page)
+	}
 	for i := startidx; i < uint(page.freeStart); {
 
 		offset := pageData[i : i+2]
 		offsetVal := binary.BigEndian.Uint16(offset)
+		if offsetVal > uint16(Init.PAGE_SIZE) {
+			fmt.Println()
+			fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
+		}
 		slots = append(slots, offsetVal)
 		i += 2
 	}
@@ -296,6 +309,9 @@ func (page *PageHeader) PageDebug() {
 }
 
 func GetPage(id uint) (*PageHeader, error) {
+	if id == 0 {
+		panic("got page zero ")
+	}
 	err := LoadPage(uint(id))
 	if err != nil {
 		return &PageHeader{}, fmt.Errorf("error while Loading the page | %w", err)

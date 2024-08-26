@@ -10,8 +10,8 @@ type NodeComponent struct {
 	// key         uint64
 	// using key directly as bytes
 	// VAL: here
-	key         []byte
-	val         []byte
+	Key         []byte
+	keyval      []byte // full key value pair as bytes
 	LeftPointer uint16
 }
 

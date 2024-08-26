@@ -20,7 +20,6 @@ func (tree *BtreePage) search(key uint32) (uint16, uint16, error) {
 		for i, val := range tree.GetSlots() {
 			// FIXME: can do the binary search here
 			cell := tree.GetCellByOffset(val)
-			// VAL: here
 			res := binary.BigEndian.Uint32(cell.CellContent[:4])
 			if res == key {
 				return uint16(i), tree.PageId, nil
@@ -30,13 +29,15 @@ func (tree *BtreePage) search(key uint32) (uint16, uint16, error) {
 		return 0, 0, fmt.Errorf("key not found %d", key)
 	}
 	for i, val := range tree.GetSlots() {
-		// can do the binary search here
+		// FIXME: can do the binary search here
 		cell := tree.GetCellByOffset(val)
-		// VAL: here
 		res := binary.BigEndian.Uint32(cell.CellContent[:4])
+		if cell.Header.LeftChild > uint16(Init.PAGE_SIZE) {
+			panic("search error while searching")
+		}
 		if res == key {
 			return uint16(i), tree.PageId, nil
-		} else if res > key {
+		} else if res > key && cell.Header.LeftChild != 0 {
 			leftPage, err := pager.GetPage(uint(cell.Header.LeftChild))
 			if err != nil {
 				return 0, 0, err
