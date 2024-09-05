@@ -46,7 +46,7 @@ func (node *BtreePage) remove(slot uint) error {
 			fmt.Println(err)
 			return err
 		}
-		node.ReplaceCell(&keyCell, rightChildCell.CellContent, leftPointer)
+		node.ReplaceCell(&keyCell,rightChildCell.CellContent,leftPointer)
 		if err := pageid.RemoveCell(uint(pageid.NumSlots) - 1); err != nil {
 			fmt.Println(err)
 			return err

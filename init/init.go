@@ -37,7 +37,7 @@ var (
 	TOTAL_PAGES     = 1
 	FILE_CH_COUNTER = 0
 	DATABASE_SIZE   = 1 // in pages
-	ROOTPAGE        = 1 // in pages
+	ROOTPAGE        = 0 // in pages
 	FREELIST_START  = 0
 	FREELIST_COUNT  = 0
 )

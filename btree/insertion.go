@@ -102,18 +102,19 @@ func (page *BtreePage) insertNonfull(buf []byte) (*BtreePage, error) {
 // This function is the main function which call the insertnonfull function
 //
 // checks pagetype of the page and inserts accordingly.
-func (node *BtreePage) Insert(key, val uint32) (*BtreePage, error) {
+func Insert(key, val uint32) (*BtreePage, error) {
 
-	// FIXME: check if node.PageType is root or root and leaf else change the node to the rootnode
-	if node.PageType != pager.ROOTPAGE && node.PageType != pager.ROOT_AND_LEAF {
-		RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
-		if err != nil {
-			return nil, fmt.Errorf("error while insert to the btree %w", err)
-		}
-		rootnode := BtreePage{*RootNode}
-		return rootnode.Insert(key, val)
-
+	if Init.ROOTPAGE == 0 {
+		Init.UpdateRootPage(1)
+		pager.MakePage(pager.ROOT_AND_LEAF, uint16(1))
+		return Insert(key, val)
 	}
+	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
+	if err != nil {
+		return nil, fmt.Errorf("error while insert to the btree %w", err)
+	}
+	node := &BtreePage{*RootNode}
+
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf[:4], key)
 	binary.BigEndian.PutUint32(buf[4:], val)

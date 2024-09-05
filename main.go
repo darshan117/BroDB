@@ -1,29 +1,28 @@
 package main
 
 import (
-	"blackdb/btree"
-	Init "blackdb/init"
-	"blackdb/pager"
-	"fmt"
+	"blackdb/query"
 	"os"
-	"syscall"
 )
 
-var file *os.File
+// var file *os.File
 
-func init() {
-	file = Init.Init()
-	// pagH, _ :=
-	pager.MakePageZero(22, 1)
-	err := pager.LoadPage(0)
-	if err != nil {
-		fmt.Println("error while loading the page")
-	}
+// func init() {
+// 	file = Init.Init()
+// 	// pagH, _ :=
+// 	pager.MakePageZero(22, 1)
+// 	err := pager.LoadPage(0)
+// 	if err != nil {
+// 		fmt.Println("error while loading the page")
+// 	}
 
-}
+// }
 
 func main() {
+	in := os.Stdin
+	w := os.Stdout
 
+	query.Start(in, w)
 	// rnode, err := btree.NewBtreePage()
 	// if err != nil {
 	// 	log.Fatal(err)
@@ -73,7 +72,7 @@ func main() {
 	// 	alltestkeys = append(alltestkeys, uint64(i))
 	// }
 
-	btree.BtreeTraversal()
+	// btree.BtreeTraversal()
 	// fmt.Println("=------remove------=")
 	// rng := rand.NewSource(984)
 	// src := rand.New(rng)
@@ -108,15 +107,15 @@ func main() {
 	// }
 	// fmt.Println(allkeys)
 
-	defer file.Close()
+	// defer file.Close()
 
-	defer func() {
-		if pager.BufData.Data != nil {
-			if err := syscall.Munmap(pager.BufData.Data); err != nil {
-				fmt.Printf("Error unmapping: %v\n", err)
-			}
-		}
-	}()
+	// defer func() {
+	// 	if pager.BufData.Data != nil {
+	// 		if err := syscall.Munmap(pager.BufData.Data); err != nil {
+	// 			fmt.Printf("Error unmapping: %v\n", err)
+	// 		}
+	// 	}
+	// }()
 }
 
 func removekeyFromarray(keys []uint64, element uint64) []uint64 {

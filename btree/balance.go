@@ -89,6 +89,7 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 	if binary.BigEndian.Uint32(midkey.Key) == binary.BigEndian.Uint32(parentkeyPair.Key) {
 		return
 	}
+	parentPage := BtreePage{*parent}
 	if midPoint > len(leftkeypairs) {
 		for i := 0; i < int(keysToBeAdjusted); i++ {
 			leftsib.AddCell(parentcell.CellContent, pager.AddCellOptions{LeftPointer: &leftsib.RightPointer})
@@ -114,7 +115,7 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 	nodePage.UpdatePageHeader()
 	leftsib.UpdatePageHeader()
 	rightsib.UpdatePageHeader()
-	parent.UpdatePageHeader()
+	parentPage.UpdatePageHeader()
 	return leftsib, rightsib, isbalanced
 
 }
@@ -126,8 +127,8 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting the first cell  %w", err)
 	}
-	if binary.BigEndian.Uint32(firstcell.CellContent[:4]) == 7250{
-		fmt.Printf("%+v \n",node)
+	if binary.BigEndian.Uint32(firstcell.CellContent[:4]) == 7250 {
+		fmt.Printf("%+v \n", node)
 		fmt.Println(node.GetKeys())
 		// panic("hello err")
 	}

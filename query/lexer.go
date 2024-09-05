@@ -1,0 +1,134 @@
+package query
+
+import (
+	"fmt"
+	"strings"
+)
+
+type Lexer struct {
+	// TODO: add fields position
+	// peek position
+	input   string
+	ch      byte
+	readPos int
+	pos     int
+}
+
+func isLetter(char byte) bool {
+	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' || char == 39 || char == '_'
+}
+func isNumber(char byte) bool {
+	return char >= '0' && char <= '9'
+}
+
+func NewLexer(input string) Lexer {
+	l := Lexer{
+		input: input,
+	}
+	l.readChar()
+	return l
+
+}
+
+func (l *Lexer) lexer() {
+	// for {
+	tok := l.NextToken()
+	if tok.Type == EOF {
+		return
+	}
+	fmt.Println(tok)
+
+	// }
+}
+
+func (l *Lexer) readChar() {
+	if l.readPos >= len(l.input) {
+		l.ch = 0
+	} else {
+		l.ch = l.input[l.readPos]
+	}
+	l.pos = l.readPos
+	l.readPos++
+}
+
+func (l *Lexer) peekChar() {
+	panic("TODO:  implement")
+}
+
+func (l *Lexer) sanitizeWhitespace() {
+	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' {
+		l.readChar()
+	}
+}
+
+func newToken(tokentype TokenType, char byte) Token {
+	return Token{Type: tokentype, Literal: string(char)}
+}
+func (l *Lexer) NextToken() Token {
+	var tok Token
+	l.sanitizeWhitespace()
+	switch l.ch {
+	case '=':
+		tok = newToken(ASSIGN, l.ch)
+	case ';':
+		tok = newToken(SEMICOLON, l.ch)
+
+	case '(':
+		tok = newToken(LPAREN, l.ch)
+	case ')':
+		tok = newToken(RPAREN, l.ch)
+	case '{':
+		tok = newToken(LBRACE, l.ch)
+	case '}':
+		tok = newToken(RBRACE, l.ch)
+	case '+':
+		tok = newToken(PLUS, l.ch)
+	case '-':
+		tok = newToken(MINUS, l.ch)
+	case '/':
+		tok = newToken(SLASH, l.ch)
+	case '*':
+		tok = newToken(ASTERISK, l.ch)
+	case '<':
+		tok = newToken(LT, l.ch)
+	case '>':
+		tok = newToken(GT, l.ch)
+	case ',':
+		tok = newToken(COMMA, l.ch)
+	case 0:
+		tok.Literal = ""
+		tok.Type = EOF
+	default:
+		if isLetter(l.ch) {
+
+			tok.Literal = strings.ToLower(l.readIdent())
+			tok.Type = LookupIdent(tok.Literal)
+			return tok
+		} else if isNumber(l.ch) {
+			tok.Type = INT
+			// FIXME: convert to integer
+			tok.Literal = l.readNumber()
+		} else {
+			newToken(ILLEGAL, l.ch)
+		}
+
+	}
+	l.readChar()
+	return tok
+
+}
+func (l *Lexer) readIdent() string {
+	pos := l.pos
+	for isLetter(l.ch) {
+		l.readChar()
+	}
+	return l.input[pos:l.pos]
+}
+
+func (l *Lexer) readNumber() string {
+	pos := l.pos
+	for isNumber(l.ch) {
+		l.readChar()
+	}
+	return l.input[pos:l.pos]
+}

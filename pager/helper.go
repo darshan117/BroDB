@@ -62,6 +62,7 @@ func (page *PageHeader) UpdatePageHeader() error {
 
 // Replaces only the cell content and its leftpointers
 func (page *PageHeader) ReplaceCell(cell *Cell, buf []byte, leftPointer uint16) {
+	defer page.UpdatePageHeader()
 	// VAL: here
 	// if page.PageId != uint16(BufData.PageNum) {
 	LoadPage(uint(page.PageId))
@@ -245,12 +246,10 @@ func (page *PageHeader) GetSlots() []uint16 {
 	slots := make([]uint16, 0)
 	// TODO: better error handling
 	if len(BufData.Data) == 0 {
-		fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
 		if err := LoadPage(uint(page.PageId)); err != nil {
 			fmt.Println(err)
 
 		}
-		fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
 		return slots
 	}
 	pageData := page.FileRead()
@@ -263,10 +262,6 @@ func (page *PageHeader) GetSlots() []uint16 {
 
 		offset := pageData[i : i+2]
 		offsetVal := binary.BigEndian.Uint16(offset)
-		if offsetVal > uint16(Init.PAGE_SIZE) {
-			fmt.Println()
-			fmt.Println("page is ", BufData.PageNum, "page asked for ", page.PageId, "len is ", BufData.Data)
-		}
 		slots = append(slots, offsetVal)
 		i += 2
 	}
