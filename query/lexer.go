@@ -15,7 +15,7 @@ type Lexer struct {
 }
 
 func isLetter(char byte) bool {
-	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' || char == 39 || char == '_'
+	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' || char == '_'
 }
 func isNumber(char byte) bool {
 	return char >= '0' && char <= '9'
@@ -31,14 +31,14 @@ func NewLexer(input string) Lexer {
 }
 
 func (l *Lexer) lexer() {
-	// for {
-	tok := l.NextToken()
-	if tok.Type == EOF {
-		return
-	}
-	fmt.Println(tok)
+	for {
+		tok := l.NextToken()
+		if tok.Type == EOF {
+			return
+		}
+		fmt.Println(tok)
 
-	// }
+	}
 }
 
 func (l *Lexer) readChar() {
@@ -48,7 +48,7 @@ func (l *Lexer) readChar() {
 		l.ch = l.input[l.readPos]
 	}
 	l.pos = l.readPos
-	l.readPos++
+	l.readPos += 1
 }
 
 func (l *Lexer) peekChar() {
@@ -95,6 +95,9 @@ func (l *Lexer) NextToken() Token {
 		tok = newToken(GT, l.ch)
 	case ',':
 		tok = newToken(COMMA, l.ch)
+	case 34:
+		tok.Type = TOKEN_TEXT
+		tok.Literal = l.readString()
 	case 0:
 		tok.Literal = ""
 		tok.Type = EOF
@@ -108,6 +111,7 @@ func (l *Lexer) NextToken() Token {
 			tok.Type = INT
 			// FIXME: convert to integer
 			tok.Literal = l.readNumber()
+			return tok
 		} else {
 			newToken(ILLEGAL, l.ch)
 		}
@@ -121,6 +125,23 @@ func (l *Lexer) readIdent() string {
 	pos := l.pos
 	for isLetter(l.ch) {
 		l.readChar()
+	}
+	return l.input[pos:l.pos]
+}
+func (l *Lexer) readstring() string {
+	pos := l.pos
+	for isLetter(l.ch) {
+		l.readChar()
+	}
+	return l.input[pos:l.pos]
+}
+func (l *Lexer) readString() string {
+	pos := l.pos + 1
+	for {
+		l.readChar()
+		if l.ch == '"' || l.ch == 0 {
+			break
+		}
 	}
 	return l.input[pos:l.pos]
 }

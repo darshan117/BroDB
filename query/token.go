@@ -25,7 +25,10 @@ const (
 	TOKEN_FROM   = "FROM"
 
 	// insert
-	TOKEN_INSERT = "BRO-SERT"
+	TOKEN_SLAM  = "SLAM"
+	TOKEN_INTO  = "INTO"
+	TOKEN_CRAZY = "CRAZY"
+	TOKEN_SHIT  = "SHIT"
 
 	// update
 	TOKEN_LISTEN  = "LISTEN"
@@ -38,6 +41,7 @@ const (
 
 	//delete
 	TOKEN_DELETE = "DITCH"
+	TOKEN_CRAP   = "CRAP"
 
 	// operation
 	ILLEGAL = "ILLEGAL"
@@ -71,7 +75,10 @@ const (
 var IdentTable = map[string]TokenType{
 	"bro":      TOKEN_BRO,
 	"up":       TOKEN_UP,
-	"bro-sert": TOKEN_INSERT,
+	"slam":     TOKEN_SLAM,
+	"into":     TOKEN_INTO,
+	"crazy":    TOKEN_CRAZY,
+	"shit":     TOKEN_SHIT,
 	"build":    TOKEN_BUILD,
 	"ditch":    TOKEN_DELETE,
 	"from":     TOKEN_FROM,
@@ -89,6 +96,7 @@ var IdentTable = map[string]TokenType{
 	"text":     TOKEN_TEXT,
 	"and":      AND,
 	"or":       OR,
+	"crap":     TOKEN_CRAP,
 }
 
 func LookupIdent(ident string) TokenType {

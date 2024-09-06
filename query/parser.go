@@ -1,6 +1,10 @@
 package query
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+)
 
 type ColumnType int
 
@@ -29,7 +33,21 @@ type ColumnDefinition struct {
 
 type InsertStatement struct {
 	// TODO: parse insert statement
+	TableName string
+	Columns   []string
+	Values    []string
+}
 
+type DeleteStatement struct {
+	TableName string
+	Where     *WhereExpression
+}
+
+type UpdateStatement struct {
+	TableName string
+	Columns   []string
+	Values    []string
+	Where     *WhereExpression
 }
 
 type SelectStatement struct {
@@ -74,6 +92,9 @@ type Statement interface {
 
 func (c *CreateStatement) GetType() {}
 func (*SelectStatement) GetType()   {}
+func (*InsertStatement) GetType()   {}
+func (*UpdateStatement) GetType()   {}
+func (*DeleteStatement) GetType()   {}
 
 type Expression struct{}
 
@@ -94,6 +115,12 @@ func (p *parser) Parser() Statement {
 		return p.parseCreateStatement()
 	case TOKEN_SELECT:
 		return p.parseSelectStatement()
+	case TOKEN_SLAM:
+		return p.parseInsertStatement()
+	case TOKEN_DELETE:
+		return p.parseDeleteStatement()
+	case TOKEN_LISTEN:
+		return p.parseUpdateStatement()
 	}
 	return nil
 }
@@ -105,7 +132,7 @@ func (p *parser) Run() {
 
 	// for !p.curTokenIs(EOF) {
 	p.getNextToken()
-	fmt.Println(p.Parser())
+	fmt.Printf("%+v\n", p.Parser())
 
 	// }
 
@@ -200,6 +227,190 @@ func (p *parser) expectPeek(t TokenType) bool {
 
 }
 
+func (p *parser) parseUpdateStatement() Statement {
+	if !p.expectPeek(TOKEN_LISTEN) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_UP) {
+		return nil
+	}
+
+	if !p.expectPeek(TOKEN_UPGRADE) {
+		return nil
+	}
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	updateStmt := UpdateStatement{TableName: p.curToken.Literal}
+	if !p.expectPeek(TOKEN_SET) {
+		return nil
+	}
+	p.getNextToken()
+	switch p.curToken.Type {
+	case IDENT:
+		// handle col
+		colname := p.curToken.Literal
+		updateStmt.Columns = append(updateStmt.Columns, colname)
+	case LPAREN:
+		for {
+			if !p.expectPeek(IDENT) {
+				return nil
+			}
+			colname := p.curToken.Literal
+			updateStmt.Columns = append(updateStmt.Columns, colname)
+			if p.peekToken.Type == RPAREN {
+				break
+			}
+			if !p.expectPeek(COMMA) {
+				return nil
+			}
+
+		}
+		p.expectPeek(RPAREN)
+		// handle multiple cols
+	default:
+		msg := fmt.Sprintf(" token should be identifier or a Left parenthesis but got %s instead ", p.curToken)
+		p.err = append(p.err, msg)
+
+	}
+	if !p.expectPeek(TOKEN_WHERE) {
+		return nil
+	}
+	p.getNextToken()
+	updateStmt.Where = &WhereExpression{p.parseExprOperation()}
+	if !p.expectPeek(SEMICOLON) {
+		return nil
+	}
+	return &updateStmt
+
+}
+
+func (p *parser) parseDeleteStatement() Statement {
+	if !p.expectPeek(TOKEN_DELETE) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_THIS) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_CRAP) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_FROM) {
+		return nil
+	}
+
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	delStmt := DeleteStatement{TableName: p.curToken.Literal}
+	if !p.expectPeek(TOKEN_WHERE) {
+		return nil
+	}
+	p.getNextToken()
+	delStmt.Where = &WhereExpression{p.parseExprOperation()}
+	if !p.expectPeek(SEMICOLON) {
+		return nil
+	}
+	fmt.Printf("---\njson encoding\n")
+	jsonData, err := json.Marshal(&delStmt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(jsonData))
+
+	return &delStmt
+
+}
+
+func (p *parser) parseInsertStatement() Statement {
+	if !p.expectPeek(TOKEN_SLAM) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_THIS) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_INTO) {
+		return nil
+	}
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	insertStmt := InsertStatement{TableName: p.curToken.Literal}
+	p.getNextToken()
+	switch p.curToken.Type {
+	case IDENT:
+		// handle col
+		colname := p.curToken.Literal
+		insertStmt.Columns = append(insertStmt.Columns, colname)
+	case LPAREN:
+		for {
+			if !p.expectPeek(IDENT) {
+				return nil
+			}
+			colname := p.curToken.Literal
+			insertStmt.Columns = append(insertStmt.Columns, colname)
+			if p.peekToken.Type == RPAREN {
+				break
+			}
+			if !p.expectPeek(COMMA) {
+				return nil
+			}
+
+		}
+		p.expectPeek(RPAREN)
+		// handle multiple cols
+	default:
+		msg := fmt.Sprintf(" token should be identifier or a Left parenthesis but got %s instead ", p.curToken)
+		p.err = append(p.err, msg)
+
+	}
+	if !p.expectPeek(TOKEN_THIS) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_CRAZY) {
+		return nil
+	}
+	if !p.expectPeek(TOKEN_SHIT) {
+		return nil
+	}
+	p.getNextToken()
+	switch p.curToken.Type {
+	case LPAREN:
+		for {
+			p.getNextToken()
+			switch p.curToken.Type {
+			case INT:
+				insertStmt.Values = append(insertStmt.Values, p.curToken.Literal)
+			case TOKEN_TEXT:
+				insertStmt.Values = append(insertStmt.Values, p.curToken.Literal)
+
+			}
+
+			if p.peekToken.Type == RPAREN {
+				break
+			}
+			if !p.expectPeek(COMMA) {
+				return nil
+			}
+
+		}
+		p.expectPeek(RPAREN)
+		// handle multiple cols
+	default:
+		msg := fmt.Sprintf(" token should be identifier or a Left parenthesis but got %s instead ", p.curToken)
+		p.err = append(p.err, msg)
+
+	}
+	if !p.expectPeek(SEMICOLON) {
+		return nil
+	}
+	if len(insertStmt.Columns) != len(insertStmt.Values) {
+		// FIXME: handle error here
+		return nil
+	}
+	return &insertStmt
+
+}
 func (p *parser) parseSelectStatement() Statement {
 	if !p.expectPeek(TOKEN_SELECT) {
 		return nil
@@ -266,8 +477,11 @@ func (p *parser) parseExprOperation() Expr {
 
 	case INT:
 		left = &ExprIntegerVal{Value: p.curToken.Literal}
-		//TODO: case string not yet implemented
+	case TOKEN_TEXT:
+		left = &ExprIntegerVal{Value: p.curToken.Literal}
+
 	}
+
 	p.getNextToken()
 	var op Operator
 	switch p.curToken.Type {
@@ -283,11 +497,14 @@ func (p *parser) parseExprOperation() Expr {
 	case INT:
 		right = &ExprIntegerVal{Value: p.curToken.Literal}
 		//TODO: case string not yet implemented
+	case TOKEN_TEXT:
+		right = &ExprStringVal{Value: p.curToken.Literal}
 		// TODO: case boolean
 	}
 	expression := ExprOperation{Left: left, Operator: op, Right: right}
-	p.getNextToken()
-	if p.curToken.Type == AND {
+	// p.getNextToken()
+	if p.peekToken.Type == AND {
+		p.getNextToken()
 		p.getNextToken()
 		right = p.parseExprOperation()
 		return &ExprOperation{&expression, OpAnd, right}
