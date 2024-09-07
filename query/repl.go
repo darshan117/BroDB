@@ -22,10 +22,12 @@ func Start(in io.Reader, out io.Writer) {
 		// l.lexer()
 
 		p := NewParser(l)
-		p.Run()
+		stmt := p.Run()
 		if len(p.err) != 0 {
 			fmt.Println(p.err)
 		}
+		q := Query{statements: stmt}
+		RunQuery(q)
 		// fmt.Println(l)
 	}
 }

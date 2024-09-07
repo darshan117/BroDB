@@ -6,6 +6,7 @@ import (
 	"blackdb/pager"
 	"encoding/binary"
 	"fmt"
+	"log"
 )
 
 // [x] read the full wikipedia page on the btree
@@ -102,22 +103,25 @@ func (page *BtreePage) insertNonfull(buf []byte) (*BtreePage, error) {
 // This function is the main function which call the insertnonfull function
 //
 // checks pagetype of the page and inserts accordingly.
-func Insert(key, val uint32) (*BtreePage, error) {
+func Insert(key uint32, val []byte) (*BtreePage, error) {
 
 	if Init.ROOTPAGE == 0 {
-		Init.UpdateRootPage(1)
-		pager.MakePage(pager.ROOT_AND_LEAF, uint16(1))
+		Init.UpdateRootPage(uint(Init.TOTAL_PAGES))
+		pager.MakePage(pager.ROOT_AND_LEAF, uint16(Init.TOTAL_PAGES))
 		return Insert(key, val)
 	}
 	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
 	if err != nil {
+		fmt.Println(Init.ROOTPAGE)
 		return nil, fmt.Errorf("error while insert to the btree %w", err)
 	}
 	node := &BtreePage{*RootNode}
 
-	buf := make([]byte, 8)
+	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf[:4], key)
-	binary.BigEndian.PutUint32(buf[4:], val)
+	// binary.BigEndian.PutUint32(buf[4:], val)
+	// copy(buf[4:], val)
+	buf = append(buf, val...)
 	defer func() {
 		buf = nil
 	}()
@@ -413,6 +417,68 @@ func (node *BtreePage) dfstraverse(keys *[]uint32) error {
 		if i < uint(node.NumSlots) {
 			cell, _ := node.GetCell(i)
 			*keys = append(*keys, binary.BigEndian.Uint32(cell.CellContent[:4]))
+		}
+	}
+	return nil
+}
+
+func BtreeDFSTraverseKeys() ([][]byte, error) {
+	RootNode, err := pager.GetPage(uint(Init.ROOTPAGE))
+	if err != nil {
+		return nil, err
+	}
+	rootnode := BtreePage{*RootNode}
+	keys := make([][]byte, 0, 100)
+	if err := rootnode.dfstraversekeys(&keys); err != nil {
+		fmt.Println(keys)
+		return nil, err
+	}
+	return keys, nil
+}
+
+func (node *BtreePage) dfstraversekeys(keys *[][]byte) error {
+	if node.PageType == pager.LEAF || node.PageType == pager.ROOT_AND_LEAF {
+		// *keys = append(*keys, node.GetKeys()...)
+		for _, val := range node.GetSlots() {
+			cell := node.GetCellByOffset(val)
+			recordPage, _ := pager.GetPage(uint(binary.BigEndian.Uint32(cell.CellContent[4:8])))
+			recordCell, _ := recordPage.GetCell(uint(binary.BigEndian.Uint16(cell.CellContent[8:])))
+			if len(recordCell.CellContent) == 0 {
+				fmt.Println(cell)
+				log.Fatalf("%+v\n,page %+v \n ", recordCell, recordPage)
+			}
+			*keys = append(*keys, recordCell.CellContent)
+			// res := binary.BigEndian.Uint32(cell.CellContent[:4])
+			// keys = append(keys, res)
+		}
+		return nil
+	}
+	for i := uint(0); i <= uint(node.NumSlots); i++ {
+		var childPtr uint16
+		if i < uint(node.NumSlots) {
+			cell, err := node.GetCell(i)
+			if err != nil {
+				return err
+			}
+			childPtr = cell.Header.LeftChild
+		} else {
+			childPtr = node.RightPointer
+		}
+
+		childPage, err := pager.GetPage(uint(childPtr))
+		if err != nil {
+			return err
+		}
+		childNode := &BtreePage{*childPage}
+		if err := childNode.dfstraversekeys(keys); err != nil {
+			return err
+		}
+		if i < uint(node.NumSlots) {
+			cell, _ := node.GetCell(i)
+			recordPage, _ := pager.GetPage(uint(binary.BigEndian.Uint32(cell.CellContent[4:8])))
+			recordCell, _ := recordPage.GetCell(uint(binary.BigEndian.Uint16(cell.CellContent[8:])))
+			*keys = append(*keys, recordCell.CellContent)
+			// *keys = append(*keys, binary.BigEndian.Uint32(cell.CellContent[:4]))
 		}
 	}
 	return nil

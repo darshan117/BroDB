@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 )
 
 type ColumnType int
@@ -22,9 +23,14 @@ const (
 	OpAnd
 )
 
+type Query struct {
+	statements Statement
+}
+
 type CreateStatement struct {
-	TableName string
-	Columns   []ColumnDefinition
+	CreateStmt string
+	TableName  string
+	Columns    []ColumnDefinition
 }
 type ColumnDefinition struct {
 	ColName string
@@ -35,7 +41,11 @@ type InsertStatement struct {
 	// TODO: parse insert statement
 	TableName string
 	Columns   []string
-	Values    []string
+	Values    []Value
+}
+type Value struct {
+	valtype ColumnType
+	val     string
 }
 
 type DeleteStatement struct {
@@ -87,14 +97,30 @@ func (*ExprStringVal) something()  {}
 func (*ExprOperation) something()  {}
 
 type Statement interface {
-	GetType()
+	GetType() StatementType
 }
+type StatementType int
 
-func (c *CreateStatement) GetType() {}
-func (*SelectStatement) GetType()   {}
-func (*InsertStatement) GetType()   {}
-func (*UpdateStatement) GetType()   {}
-func (*DeleteStatement) GetType()   {}
+const (
+	// StatementSelect for SELECT query
+	StatementSelect StatementType = iota
+	// StatementUpdate for UPDATE query
+	StatementUpdate
+	// StatementInsert for INSERT query
+	StatementInsert
+	// StatementDelete for DELETE query
+	StatementDelete
+	// StatementCreateTable for CREATE TABLE query
+	StatementCreateTable
+	// StatementDropTable for DROP TABLE query
+	StatementDropTable
+)
+
+func (*CreateStatement) GetType() StatementType { return StatementCreateTable }
+func (*SelectStatement) GetType() StatementType { return StatementSelect }
+func (*InsertStatement) GetType() StatementType { return StatementInsert }
+func (*UpdateStatement) GetType() StatementType { return StatementUpdate }
+func (*DeleteStatement) GetType() StatementType { return StatementDelete }
 
 type Expression struct{}
 
@@ -128,11 +154,11 @@ func NewParser(lexer Lexer) parser {
 	return parser{l: &lexer}
 }
 
-func (p *parser) Run() {
+func (p *parser) Run() Statement {
 
 	// for !p.curTokenIs(EOF) {
 	p.getNextToken()
-	fmt.Printf("%+v\n", p.Parser())
+	return p.Parser()
 
 	// }
 
@@ -170,7 +196,7 @@ func (p *parser) parseCreateStatement() Statement {
 		return nil
 	}
 	tablename := p.curToken.Literal
-	table := &CreateStatement{TableName: tablename}
+	table := &CreateStatement{CreateStmt: strings.ToUpper(p.l.input), TableName: tablename}
 	if !p.expectPeek(LPAREN) {
 		return nil
 	}
@@ -380,9 +406,9 @@ func (p *parser) parseInsertStatement() Statement {
 			p.getNextToken()
 			switch p.curToken.Type {
 			case INT:
-				insertStmt.Values = append(insertStmt.Values, p.curToken.Literal)
+				insertStmt.Values = append(insertStmt.Values, Value{valtype: Integer, val: p.curToken.Literal})
 			case TOKEN_TEXT:
-				insertStmt.Values = append(insertStmt.Values, p.curToken.Literal)
+				insertStmt.Values = append(insertStmt.Values, Value{valtype: Text, val: p.curToken.Literal})
 
 			}
 

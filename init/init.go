@@ -32,14 +32,14 @@ func Init() *os.File {
 }
 
 var (
-	MAGICCODE       = "BroDB\000"
-	PAGE_SIZE       = os.Getpagesize()
-	TOTAL_PAGES     = 1
-	FILE_CH_COUNTER = 0
-	DATABASE_SIZE   = 1 // in pages
-	ROOTPAGE        = 0 // in pages
-	FREELIST_START  = 0
-	FREELIST_COUNT  = 0
+	MAGICCODE      = "BroDB\000"
+	PAGE_SIZE      = os.Getpagesize()
+	TOTAL_PAGES    = 1
+	SCHEMA_TABLE   = 0
+	RECORD_PAGE    = 0 // in pages
+	ROOTPAGE       = 0 // in pages
+	FREELIST_START = 0
+	FREELIST_COUNT = 0
 )
 
 // 							Database Header Format
@@ -74,14 +74,13 @@ func makeFileHeader(file *os.File) error {
 	Header := make([]byte, headersize)
 	copy(Header, []byte(MAGICCODE))
 	binary.BigEndian.PutUint16(Header[16:], uint16(PAGE_SIZE))
-	binary.BigEndian.PutUint32(Header[18:], uint32(FILE_CH_COUNTER))   // file change counter
-	binary.BigEndian.PutUint32(Header[18+4:], uint32(DATABASE_SIZE))   // database size in pages
-	binary.BigEndian.PutUint32(Header[22+4:], uint32(FILE_CH_COUNTER)) // pagenumber of largest root node btree page
-	binary.BigEndian.PutUint32(Header[26+4:], uint32(TOTAL_PAGES))     // Total number of pages
-	binary.BigEndian.PutUint32(Header[34:], uint32(ROOTPAGE))          // Rootpage number
-	binary.BigEndian.PutUint32(Header[38:], uint32(FREELIST_START))    //  first freelist page
-	binary.BigEndian.PutUint32(Header[42:], uint32(FREELIST_COUNT))    // Total number of freelist pages
-	binary.BigEndian.PutUint16(Header[48:], uint16(8))                 // end delimiter
+	binary.BigEndian.PutUint32(Header[18:], uint32(SCHEMA_TABLE))   // file change counter
+	binary.BigEndian.PutUint32(Header[22:], uint32(RECORD_PAGE))    // database size in pages
+	binary.BigEndian.PutUint32(Header[26+4:], uint32(TOTAL_PAGES))  // Total number of pages
+	binary.BigEndian.PutUint32(Header[34:], uint32(ROOTPAGE))       // Rootpage number
+	binary.BigEndian.PutUint32(Header[38:], uint32(FREELIST_START)) //  first freelist page
+	binary.BigEndian.PutUint32(Header[42:], uint32(FREELIST_COUNT)) // Total number of freelist pages
+	binary.BigEndian.PutUint16(Header[48:], uint16(8))              // end delimiter
 	// can do add other header things if needed
 	err := binary.Write(file, binary.BigEndian, Header) // magic code Brodb
 	if err != nil {
@@ -111,7 +110,7 @@ func UpdateFreelist(pageNo uint) error {
 	binary.BigEndian.PutUint32(buff, uint32(pageNo))
 	_, err := Dbfile.WriteAt(buff, 38) // 0 means relative to the origin of the file
 	if err != nil {
-		return fmt.Errorf("error changing the rootpage: %w", err)
+		return fmt.Errorf("error changing the freelist page: %w", err)
 	}
 	FREELIST_START = int(pageNo)
 	return nil
@@ -124,8 +123,21 @@ func UpdateFreelistCount(count uint) error {
 	binary.BigEndian.PutUint32(buff, uint32(FREELIST_COUNT))
 	_, err := Dbfile.WriteAt(buff, 42) // 0 means relative to the origin of the file
 	if err != nil {
-		return fmt.Errorf("error changing the rootpage: %w", err)
+		return fmt.Errorf("error changing the freelist page: %w", err)
 	}
+	return nil
+
+}
+
+func UpdateSchemaTable(pageNo uint) error {
+	buff := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(buff, uint32(pageNo))
+	_, err := Dbfile.WriteAt(buff, 18) // 0 means relative to the origin of the file
+	if err != nil {
+		return fmt.Errorf("error changing the schema table: %w", err)
+	}
+	SCHEMA_TABLE = int(pageNo)
 	return nil
 
 }

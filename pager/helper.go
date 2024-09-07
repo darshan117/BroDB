@@ -14,7 +14,7 @@ func (page *PageHeader) serializePageHeader(pageHeader []byte) []byte {
 
 	binary.BigEndian.PutUint16(pageHeader[0:], uint16(page.PageId))
 	pageHeader[2] = byte(page.PageType)
-	binary.BigEndian.PutUint16(pageHeader[3:], uint16(page.freeStart))
+	binary.BigEndian.PutUint16(pageHeader[3:], uint16(page.FreeStart))
 	binary.BigEndian.PutUint16(pageHeader[5:], uint16(page.freeEnd))
 	binary.BigEndian.PutUint16(pageHeader[7:], uint16(page.totalFree))
 	binary.BigEndian.PutUint16(pageHeader[9:], uint16(page.NumSlots))
@@ -29,7 +29,7 @@ func deserializePageHeader(pageHeader []byte) PageHeader {
 	var Header PageHeader
 	Header.PageId = binary.BigEndian.Uint16(pageHeader[:2])
 	Header.PageType = PageType(pageHeader[2])
-	Header.freeStart = binary.BigEndian.Uint16(pageHeader[3:5])
+	Header.FreeStart = binary.BigEndian.Uint16(pageHeader[3:5])
 	Header.freeEnd = binary.BigEndian.Uint16(pageHeader[5:7])
 	Header.totalFree = binary.BigEndian.Uint16(pageHeader[7:9])
 	Header.NumSlots = binary.BigEndian.Uint16(pageHeader[9:])
@@ -64,9 +64,9 @@ func (page *PageHeader) UpdatePageHeader() error {
 func (page *PageHeader) ReplaceCell(cell *Cell, buf []byte, leftPointer uint16) {
 	defer page.UpdatePageHeader()
 	// VAL: here
-	// if page.PageId != uint16(BufData.PageNum) {
-	LoadPage(uint(page.PageId))
-	// }
+	if page.PageId != uint16(BufData.PageNum) {
+		LoadPage(uint(page.PageId))
+	}
 	// load page while replacing cell
 	// res := make([]byte, 4)
 	// binary.BigEndian.PutUint32(res[0:], key)
@@ -107,10 +107,6 @@ func (cell *Cell) deserializeCell(cellHeader []byte) error {
 	cell.Header.cellLoc = binary.BigEndian.Uint16(cellHeader[:2])
 	cell.Header.cellSize = binary.BigEndian.Uint16(cellHeader[2:4])
 	// FIXME: made ti const
-	if cell.Header.cellSize > 8 {
-
-		return fmt.Errorf("Error got the cellSize as %d", cell.Header.cellSize)
-	}
 	if int(cellHeader[4]) == 1 {
 		cell.Header.isOverflow = true
 	} else {
@@ -162,7 +158,7 @@ func (page *PageHeader) ShiftSlots(idx uint) {
 		slotIndex += 2
 
 	}
-	binary.BigEndian.PutUint16(BufData.Data[page.freeStart-2:page.freeStart], uint16(0))
+	binary.BigEndian.PutUint16(BufData.Data[page.FreeStart-2:page.FreeStart], uint16(0))
 }
 
 func (page *PageHeader) InsertSlot(idx int, offsetVal uint16) {
@@ -198,13 +194,13 @@ func (page *PageHeader) RemoveRange(start, end uint) error {
 		page.totalFree += uint16(CELL_HEAD_SIZE)
 		page.totalFree += 2 // slot size has
 	}
-	copy(BufData.Data[startIndex:], BufData.Data[endIndex:page.freeStart])
+	copy(BufData.Data[startIndex:], BufData.Data[endIndex:page.FreeStart])
 
-	// for i := page.freeStart - uint16(endIndex-startIndex); i < page.freeStart; i++ {
+	// for i := page.FreeStart - uint16(endIndex-startIndex); i < page.FreeStart; i++ {
 	// 	BufData.Data[i] = 0
 	// }
 
-	page.freeStart -= uint16(endIndex - startIndex)
+	page.FreeStart -= uint16(endIndex - startIndex)
 	page.NumSlots -= uint16(end - start)
 	page.UpdatePageHeader()
 	return nil
@@ -213,11 +209,14 @@ func (page *PageHeader) RemoveRange(start, end uint) error {
 // TODO: can use db read here
 func (page *PageHeader) SlotArray() map[uint16]PointerList {
 	var slotmap = make(map[uint16]PointerList)
+	// if BufData.PageNum != uint(page.PageId) {
 	LoadPage(uint(page.PageId))
+
+	// }
 	startidx := PAGEHEAD_SIZE // page Header size make it global
 	id := 0
 
-	for i := startidx; i < uint(page.freeStart); {
+	for i := startidx; i < uint(page.FreeStart); {
 		var slot PointerList
 		offset := make([]byte, 2)
 		copy(offset, BufData.Data[i:i+2])
@@ -253,12 +252,12 @@ func (page *PageHeader) GetSlots() []uint16 {
 		return slots
 	}
 	pageData := page.FileRead()
-	if page.freeStart > uint16(Init.PAGE_SIZE) {
+	if page.FreeStart > uint16(Init.PAGE_SIZE) {
 
 		fmt.Println(Init.TOTAL_PAGES)
 		log.Fatalf("%+v\n", page)
 	}
-	for i := startidx; i < uint(page.freeStart); {
+	for i := startidx; i < uint(page.FreeStart); {
 
 		offset := pageData[i : i+2]
 		offsetVal := binary.BigEndian.Uint16(offset)
@@ -331,7 +330,7 @@ func (overflow *OverflowPtr) serializeOverflow() []byte {
 }
 
 func (page *PageHeader) checkUsableSpace() int {
-	return int(page.freeEnd - page.freeStart)
+	return int(page.freeEnd - page.FreeStart)
 }
 
 func (node *PageHeader) UpdateLeftPointer(newLoc uint, cell *Cell) {

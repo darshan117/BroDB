@@ -1,22 +1,25 @@
 package main
 
 import (
+	Init "blackdb/init"
+	"blackdb/pager"
 	"blackdb/query"
+	"fmt"
 	"os"
 )
 
-// var file *os.File
+var file *os.File
 
-// func init() {
-// 	file = Init.Init()
-// 	// pagH, _ :=
-// 	pager.MakePageZero(22, 1)
-// 	err := pager.LoadPage(0)
-// 	if err != nil {
-// 		fmt.Println("error while loading the page")
-// 	}
+func init() {
+	file = Init.Init()
+	// 	// pagH, _ :=
+	pager.MakePageZero(22, 1)
+	err := pager.LoadPage(0)
+	if err != nil {
+		fmt.Println("error while loading the page")
+	}
 
-// }
+}
 
 func main() {
 	in := os.Stdin

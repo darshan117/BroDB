@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 )
 
 var (
@@ -46,14 +47,14 @@ func MakePage(ptype PageType, id uint16) (*PageHeader, error) {
 	page := PageHeader{
 		PageId:         id,
 		PageType:       ptype,
-		freeStart:      uint16(PAGEHEAD_SIZE),
+		FreeStart:      uint16(PAGEHEAD_SIZE),
 		freeEnd:        uint16(Init.PAGE_SIZE),
 		NumSlots:       0,
 		lastOffsetUsed: 0,
 		RightPointer:   0,
 		flags:          8,
 	}
-	page.totalFree = page.freeEnd - page.freeStart
+	page.totalFree = page.freeEnd - page.FreeStart
 	ser := page.serializePageHeader(pageHeader)
 	_, err := Init.Dbfile.Write(ser)
 	if err != nil {
@@ -72,14 +73,14 @@ func MakePageZero(ptype PageType, id uint16) (PageHeader, error) {
 	page := PageHeader{
 		PageId:         id,
 		PageType:       ptype,
-		freeStart:      uint16(PAGEHEAD_SIZE) + 50,
+		FreeStart:      uint16(PAGEHEAD_SIZE) + 50,
 		freeEnd:        uint16(Init.PAGE_SIZE),
 		NumSlots:       0,
 		lastOffsetUsed: 0,
 		RightPointer:   0,
 		flags:          8,
 	}
-	page.totalFree = page.freeEnd - page.freeStart
+	page.totalFree = page.freeEnd - page.FreeStart
 	ser := page.serializePageHeader(pageHeader)
 	_, err := Init.Dbfile.Seek(50, 0) // 0 means relative to the origin of the file
 	if err != nil {
@@ -119,8 +120,9 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 			return err
 		}
 
-	} else if cellSize > int(page.totalFree) {
-		return PagerError("Addcell", ErrNoRoom, fmt.Errorf("total free is %d", page.totalFree))
+	} else if cellSize+int(SLOT_SIZE)+2 > int(page.totalFree) {
+		return ErrNoRoom
+		// return PagerError("Addcell", ErrNoRoom, fmt.Errorf("total free is %d", page.totalFree))
 	}
 	if cellSize > int(page.checkUsableSpace()) && cellSize > int(MINCELLSIZE) {
 		// TODO: make a new Function handle overFlow cell
@@ -143,7 +145,7 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 
 	}
 	cellSer, n := cell.Header.serializeCell(cell.CellContent)
-	if page.freeEnd-uint16(n) <= page.freeStart+50 { // padding{
+	if page.freeEnd-uint16(n) <= page.FreeStart+50 { // padding{
 		if err := page.Defragment(); err != nil {
 			return PagerError("Addcell", ErrDefragmentation, err)
 		}
@@ -154,10 +156,14 @@ func (page *PageHeader) AddCell(cellContent []byte, opt ...AddCellOptions) error
 	if len(opt) > 0 && opt[0].Index != nil {
 		page.InsertSlot(*opt[0].Index, page.freeEnd)
 	} else {
-		binary.BigEndian.PutUint16(BufData.Data[page.freeStart:page.freeStart+2], page.freeEnd)
+		binary.BigEndian.PutUint16(BufData.Data[page.FreeStart:page.FreeStart+2], page.freeEnd)
 	}
 
-	page.freeStart += uint16(SLOT_SIZE)
+	page.FreeStart += uint16(SLOT_SIZE)
+	if int(page.totalFree)-((copySize)+int(SLOT_SIZE)) < 0 {
+		log.Fatalf("copy size is greater %+v\n", page)
+
+	}
 	page.totalFree -= uint16(copySize + int(SLOT_SIZE)) // +2
 	page.NumSlots += 1
 
@@ -180,7 +186,7 @@ func (page *PageHeader) RemoveCell(idx uint) error {
 	page.totalFree += oldCell.Header.cellSize
 	page.totalFree += uint16(CELL_HEAD_SIZE)
 	page.ShiftSlots(idx)
-	page.freeStart -= 2
+	page.FreeStart -= 2
 	page.NumSlots -= 1
 	page.totalFree += 2 // slot size has
 
@@ -269,7 +275,7 @@ func (page *PageHeader) Defragment() error {
 
 	}
 	page.freeEnd = destPointer
-	page.totalFree = page.freeEnd - page.freeStart
+	page.totalFree = page.freeEnd - page.FreeStart
 	page.flags = 2
 	return nil
 }

@@ -7,6 +7,8 @@ const (
 	INTERIOR
 	LEAF
 	ROOT_AND_LEAF
+	SCHEMA_PAGE
+	RECORD_PAGE
 )
 
 // PageHeader represents a page in the database.
@@ -19,7 +21,7 @@ type PageHeader struct {
 	// FIXME: might need to remove the pageId
 	PageId         uint16
 	PageType       PageType
-	freeStart      uint16
+	FreeStart      uint16
 	freeEnd        uint16
 	totalFree      uint16
 	NumSlots       uint16

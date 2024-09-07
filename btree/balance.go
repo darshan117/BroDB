@@ -127,11 +127,6 @@ func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *Btree
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting the first cell  %w", err)
 	}
-	if binary.BigEndian.Uint32(firstcell.CellContent[:4]) == 7250 {
-		fmt.Printf("%+v \n", node)
-		fmt.Println(node.GetKeys())
-		// panic("hello err")
-	}
 	leftPage, err := GetLeftPage(firstcell.CellContent[:4])
 	if err != nil {
 		return nil, nil, err
@@ -228,7 +223,7 @@ func (node *BtreePage) NodeParent(key uint32) (*uint16, *uint16, error) {
 
 func (node *BtreePage) keyIsPresent(key uint32) bool {
 	// fmt.Println(node.PageId)
-	pager.LoadPage(uint(node.PageId))
+	// pager.LoadPage(uint(node.PageId))
 	for _, val := range node.GetSlots() {
 		// FIXME: can do the binary search here
 		cell := node.GetCellByOffset(val)

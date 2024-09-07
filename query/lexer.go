@@ -15,7 +15,7 @@ type Lexer struct {
 }
 
 func isLetter(char byte) bool {
-	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' || char == '_'
+	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' || char == '_' || char == 39
 }
 func isNumber(char byte) bool {
 	return char >= '0' && char <= '9'
@@ -104,8 +104,8 @@ func (l *Lexer) NextToken() Token {
 	default:
 		if isLetter(l.ch) {
 
-			tok.Literal = strings.ToLower(l.readIdent())
-			tok.Type = LookupIdent(tok.Literal)
+			tok.Literal = l.readIdent()
+			tok.Type = LookupIdent(strings.ToLower(tok.Literal))
 			return tok
 		} else if isNumber(l.ch) {
 			tok.Type = INT
