@@ -62,6 +62,7 @@ type UpdateStatement struct {
 
 type SelectStatement struct {
 	TableName string
+	ShowAll   bool
 	Columns   []string
 	Where     *WhereExpression
 
@@ -448,6 +449,8 @@ func (p *parser) parseSelectStatement() Statement {
 	selquery := SelectStatement{}
 	p.getNextToken()
 	switch p.curToken.Type {
+	case TOKEN_ALL:
+		selquery.ShowAll = true
 	case IDENT:
 		// handle col
 		colname := p.curToken.Literal

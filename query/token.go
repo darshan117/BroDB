@@ -23,6 +23,7 @@ const (
 	TOKEN_SELECT = "SHOW"
 	TOKEN_ME     = "ME"
 	TOKEN_FROM   = "FROM"
+	TOKEN_ALL    = "ALL"
 
 	// insert
 	TOKEN_SLAM  = "SLAM"
@@ -97,6 +98,7 @@ var IdentTable = map[string]TokenType{
 	"and":      AND,
 	"or":       OR,
 	"crap":     TOKEN_CRAP,
+	"all":      TOKEN_ALL,
 }
 
 func LookupIdent(ident string) TokenType {

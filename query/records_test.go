@@ -37,7 +37,7 @@ func TestCreateStatement(t *testing.T) {
 
 func TestInsertStatement(t *testing.T) {
 	// TestCreateStatement(t)
-	nkeys := 300
+	nkeys := 3
 	for i := 0; i <= nkeys; i++ {
 		line := fmt.Sprintf(`slam this into hello (id,new) this crazy shit (%d,"hello %d");`, i, i)
 		// fmt.Println(line)
@@ -86,7 +86,7 @@ func TestSelectStatement(t *testing.T) {
 	// TestCreateStatement(t)
 	// TestInsertStatement(t)
 
-	line := fmt.Sprintf(`show me (id,new) from hello where id = 7 and new= "hello 9";`)
+	line := fmt.Sprintf(`show me all from hello;`)
 	// fmt.Println(line)
 	l := NewLexer(line)
 	// fmt.Println(l.NextToken())

@@ -8,3 +8,6 @@ for i in range(len(test)-1):
     print(diff)
 print(test)
 
+let's build this playbook hello ( id int, line text,succes_rate int);
+slam this into hello ( id , line ) this crazy shit (0 , "might workd now");
+show me all from hello;

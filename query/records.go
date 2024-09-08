@@ -17,11 +17,13 @@ type Column struct {
 }
 
 type ColumnValues map[string]Value
+type ColumnVal map[string][]string
 type Schema struct {
-	RowId     int
-	TableName string
-	AllCols   []ColumnDefinition
-	Columns   ColumnValues
+	PrimaryKey string
+	RowId      int
+	TableName  string
+	AllCols    []ColumnDefinition
+	Columns    ColumnValues
 }
 
 // supported type for the column are
@@ -124,16 +126,13 @@ func SchemaInitialization() {
 
 }
 func (is *InsertStatement) InsertRecord(sch Schema) error {
-	// check  for the cols names and their corresponding
 	record := sch.Columns
 	schema.RowId++
 	if _, ok := record["ROWID"]; ok {
-		// check val type with schema
 		record["ROWID"] = Value{Integer, strconv.Itoa(schema.RowId)}
 	}
 	for i := 0; i < len(is.Columns); i++ {
 		if _, ok := sch.Columns[is.Columns[i]]; !ok {
-			// check val type with schema
 			return fmt.Errorf("InsertRecord: given column name does not exist. %s ", is.Columns[i])
 		}
 		val := sch.Columns[is.Columns[i]]
@@ -142,16 +141,11 @@ func (is *InsertStatement) InsertRecord(sch Schema) error {
 		}
 		record[is.Columns[i]] = Value{val: is.Values[i].val, valtype: is.Values[i].valtype}
 	}
-	// get the page
-	// fmt.Println(record)
 	serRecord := serializeRecord(record)
-	// fmt.Println(serRecord)
-
 	return AddRecord(serRecord)
 }
 
 func AddRecord(rec []byte) error {
-	// check if the record page exists
 	if Init.RECORD_PAGE == 0 {
 		Init.RECORD_PAGE = Init.TOTAL_PAGES
 		_, err := pager.MakePage(pager.RECORD_PAGE, uint16(Init.TOTAL_PAGES))
@@ -165,7 +159,6 @@ func AddRecord(rec []byte) error {
 		fmt.Println(Init.RECORD_PAGE, Init.TOTAL_PAGES)
 		return fmt.Errorf("AddRecord: get page %w ", err)
 	}
-	// fmt.Println("cell", rec)
 
 	slot := int((page.FreeStart)-uint16(pager.PAGEHEAD_SIZE)) / 2
 	if err := page.AddCell(rec); err != nil {
@@ -186,31 +179,15 @@ func AddRecord(rec []byte) error {
 		}
 
 	}
-	// insert the rowid to the btree
 	buf := make([]byte, 6)
 	binary.BigEndian.PutUint32(buf[0:], uint32(Init.RECORD_PAGE))
-	// slot := int((page.FreeStart-2)-uint16(pager.PAGEHEAD_SIZE)) / 2
-
 	binary.BigEndian.PutUint16(buf[4:], uint16(slot))
 	fmt.Println(buf)
-
-	// defer func() {
-	// 	buf = nil
-	// }()
-	// _, err = btree.Insert(uint32(schema.RowId), uint32(Init.RECORD_PAGE))
 	_, err = btree.Insert(uint32(schema.RowId), buf)
 	if err != nil {
 		return err
 	}
-	// for i := 0; i < int(page.NumSlots); i++ {
-	// 	cell, _ := page.GetCell(uint(i))
-	// 	fmt.Println(deserializeRecord(cell.CellContent))
-	// 	fmt.Println(cell.CellContent)
-	// 	// rpage, _ := pager.GetPage(uint(Init.ROOTPAGE))
-	// 	fmt.Println(schema.RowId)
 
-	// }
-	// fmt.Println(rpage.GetKeys())
 	return nil
 }
 
@@ -242,7 +219,6 @@ func serializeRecord(record ColumnValues) []byte {
 		}
 
 	}
-	// var buf bytes.Buffer
 	return result
 
 }
@@ -263,10 +239,10 @@ func deserializeRecord(buf []byte) ColumnValues {
 		case Text:
 			length := buf[pointer]
 			pointer += 1
-			record[col.ColName] = Value{val: string(buf[pointer : pointer+int(length)]), valtype: Integer}
+			record[col.ColName] = Value{val: string(buf[pointer : pointer+int(length)]), valtype: Text}
 			pointer += int(length)
 		case Boolean:
-			record[col.ColName] = Value{val: string(buf[pointer]), valtype: Integer}
+			record[col.ColName] = Value{val: string(buf[pointer]), valtype: Boolean}
 
 		}
 
@@ -277,21 +253,24 @@ func deserializeRecord(buf []byte) ColumnValues {
 
 func (sel *SelectStatement) SelectAll() ([]ColumnValues, error) {
 	if sel.TableName != schema.TableName {
-		log.Fatal("got different table name")
+		log.Fatal("got different table multiple table support not yet supported")
 	}
+	return getAllRecords()
+
+}
+func getAllRecords() ([]ColumnValues, error) {
 	AllRecords, err := btree.BtreeDFSTraverseKeys()
 	if err != nil {
 		return nil, err
 	}
 	colsvals := make([]ColumnValues, 0)
 	for _, v := range AllRecords {
-		fmt.Println(v)
 		if len(v) == 0 {
 			break
 		}
-		colsvals = append(colsvals, deserializeRecord(v))
+		col := deserializeRecord(v)
+		colsvals = append(colsvals, col)
 	}
-	// fmt.Println(deserializeRecord(v))
 	return colsvals, nil
 
 }
@@ -299,7 +278,6 @@ func (sel *SelectStatement) SelectAll() ([]ColumnValues, error) {
 func (sel *SelectStatement) EvalSelect() error {
 	for i := 0; i < len(sel.Columns); i++ {
 		if _, ok := schema.Columns[sel.Columns[i]]; !ok {
-			// check val type with schema
 			return fmt.Errorf("SelectRecord: given column name does not exist. %s ", sel.Columns[i])
 		}
 	}
@@ -307,23 +285,32 @@ func (sel *SelectStatement) EvalSelect() error {
 	if err != nil {
 		return err
 	}
-	// FIXME: can make it string easy for rendering tables
-	// fmt.Println(allRecs)
-	// colWithAllVals := make(map[string][]string, 0)
-	// for _, v := range allRecs {
-	// 	for i := 0; i < len(sel.Columns); i++ {
-	// 		colWithAllVals[sel.Columns[i]] = append(colWithAllVals[sel.Columns[i]], v[sel.Columns[i]].val)
+	rows := make([]int, 0)
+	if sel.ShowAll {
+		for _, v := range schema.AllCols {
+			if v.ColName == "ROWID" {
+				continue
+			}
+			sel.Columns = append(sel.Columns, v.ColName)
 
-	// 	}
-	// }
-	// fmt.Println(colWithAllVals)
+		}
+		for i := range len(allRecs) {
+			rows = append(rows, i)
+
+		}
+	}
+	// FIXME: can make it string easy for rendering tables
+	table := Table{cols: sel.Columns, TableName: sel.TableName}
 	if sel.Where != nil {
 		switch s := sel.Where.Expr.(type) {
 		case *ExprOperation:
-			fmt.Println(s.EvalExpOp(allRecs))
+			rows = s.EvalExpOp(allRecs)
+			fmt.Println("rows are ", rows)
+			FilterRowsAndRenderTable(allRecs, rows, table)
+			return nil
 		}
 	}
-
+	FilterRowsAndRenderTable(allRecs, rows, table)
 	return nil
 }
 
@@ -335,7 +322,6 @@ func (ex *ExprOperation) EvalExpOp(allRecs []ColumnValues) []int {
 		switch e := ex.Left.(type) {
 		case *ExprIdentifier:
 			ident = e.Name
-
 		}
 
 		switch e := ex.Right.(type) {
@@ -343,17 +329,22 @@ func (ex *ExprOperation) EvalExpOp(allRecs []ColumnValues) []int {
 			val = e.Value
 		case *ExprIntegerVal:
 			val = e.Value
-
+		}
+		if ident == schema.PrimaryKey {
+			// TODO: handle btree.Search()
 		}
 		colWithAllVals := make([]int, 0)
 		for i, v := range allRecs {
 
-			if v[ident].val == val {
+			if EvalOperation(v[ident].val, val, OpEquals) {
 				colWithAllVals = append(colWithAllVals, i)
 
 			}
 		}
+
 		return colWithAllVals
+		// TODO: Same can be done to greater than eq and less than eq
+
 	case OpAnd:
 		leftval := ex.Left.(*ExprOperation).EvalExpOp(allRecs)
 		rightval := ex.Right.(*ExprOperation).EvalExpOp(allRecs)
@@ -374,17 +365,19 @@ func findIntersectionUnsorted(arr1, arr2 []int) []int {
 	for _, num := range arr2 {
 		if set[num] {
 			result = append(result, num)
-			delete(set, num)
+			// delete(set, num)
 		}
 	}
 
 	return result
 }
+func EvalOperation(left, right string, operation Operator) bool {
+	switch operation {
+	case OpEquals:
+		return left == right
+		// case less than
+		// case greater than
 
-// TODO: function to insert new record to the correct spot
-
-// TODO: function to add the new record
-
-// TODO: function to update the current record page
-
-// TODO: function to deserialize the record
+	}
+	return false
+}
