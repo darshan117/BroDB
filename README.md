@@ -1,66 +1,57 @@
-# BroDB
-It a simple toy database engine like sqlite written in golang
-but it has something called bro query language 
-use table.brocode to get the schema
-hey bro to get help
-id should be name broid `pronounced bro id`
+# BroDB:
 
-CREATE TABLE query:
+## What's the Deal, Bro? 
 
-YO BRO, LET'S BUILD THIS
-DESIGN THE PLAYBOOK
-  pickup_lines (
-    id INT AWESOME_INCREMENT,
-    the_line VARCHAR(255) NOT LAME,
-    success_rate FLOAT DEFAULT 0.83,
-    last_used TIMESTAMP,
-    PRIMARY KEY (id)
-  )
-CHALLENGE ACCEPTED!
+Welcome to BroDB, the database that's got your back like a true bro! Written from scratch in Go (because real bros don't need no third-party libraries).
 
+## Features 😎
 
-Basic SELECT:
+- **B-tree Indexing**: Our B-trees are so jacked, they make binary trees look like twigs.
+- **Table Rendering**: Tables so pretty, you'll want to frame them and hang them in your man cave.
+- **Bro Query Language (BQL)**: SQL's cooler, more laid-back cousin. It's like talking to your bros, but for data!
 
-YO BRO, SHOW ME
-  all_the_bros
-FROM
-  my_squad
-BOOM!
+## Getting Started: Time to Crush It! 
 
-Simple INSERT:
+1. Clone this repo 
+2. Build it 
+3. Run it (./brodb dbfile_name)
 
-BRO, ADD THIS
-TOSS INTO
-  epic_nights (date, story)
-THIS AWESOME TALE
-  ('2024-07-10', 'Pulled off the Weekend at Bernies!')
-NAILED IT!
+## Bro Query Language: Speak Bro, Query Bro 
 
-Easy UPDATE:
+### Create a Table 
 
-BRO, LISTEN UP
-UPGRADE
-  my_stats
-SET
-  awesomeness = 11
-WHERE
-  name = 'Barney'
-LEGENDARY!
+```
+BRO, LET'S BUILD THIS PLAYBOOK pickup_lines (
+    id INT,
+    the_line TEXT,
+    success_rate INT
+);
+```
 
-Quick DELETE:
+### Select Data 
 
-YO BRO, DITCH THIS
-GHOST FROM
-  lame_ideas
-WHERE
-  idea = 'Getting married'
-FREEDOM!
+```
+bro, show me all from pickup_lines;
 
-Basic COUNT:
+# Or get specific, bro
+bro, show me all from pickup_lines where id = 7 and the_line="Are you a parking ticket? 'Cause you've got FINE written all over you.";
+```
 
-BRO, COUNT THIS
-HOW MANY
-  successful_pickups
-FROM
-  last_night
-SCORE!
+### Delete Data 
+
+```
+bro, DITCH this crap from pickup_lines where the_line="Did it hurt when you fell from heaven?";
+```
+
+- **Bro-Friendly**: If your database doesn't talk like your bros, is it even a real database?
+
+## Contributing: Become a Bro-veloper 
+
+1. Fork it (like you fork your bicep curls)
+2. Create your feature branch (`git checkout -b feature/AmazingBroFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingBroFeature'`)
+4. Push to the branch (`git push origin feature/AmazingBroFeature`)
+5. Open a Pull Request (and flex on them code reviewers)
+
+---
+
