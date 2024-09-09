@@ -5,7 +5,6 @@ import (
 	Init "blackdb/init"
 	"blackdb/pager"
 	"fmt"
-	"log"
 	"reflect"
 	"testing"
 )
@@ -17,19 +16,20 @@ func Initialize() {
 	if err != nil {
 		fmt.Println("error while loading the page")
 	}
-	if Init.SCHEMA_TABLE != 0 {
-		schemaPage, err := pager.GetPage(uint(Init.SCHEMA_TABLE))
-		if err != nil {
-			log.Fatal(err)
-		}
-		schemaCell, err := schemaPage.GetCell(0)
-		log.Fatal(string(schemaCell.CellContent))
-	}
+	// if Init.SCHEMA_TABLE != 0 {
+	// 	schemaPage, err := pager.GetPage(uint(Init.SCHEMA_TABLE))
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	schemaCell, err := schemaPage.GetCell(0)
+	// 	s
+	// 	// log.Fatal(string(schemaCell.CellContent))
+	// }
 }
 
 func TestCreateStatement(t *testing.T) {
 	Initialize()
-	line := `let's build this playbook pickupline( id  int, new text) id Primary_Key;`
+	line := `let's build this playbook pickupline( id  int, new text,success_rate int);`
 	l := NewLexer(line)
 	p := NewParser(l)
 	stmt := p.Run()
@@ -74,7 +74,7 @@ func TestInsertStatement(t *testing.T) {
 
 func TestSelectStatement(t *testing.T) {
 
-	line := fmt.Sprintf(`show me all from pickupline where id = 0;`)
+	line := fmt.Sprintf(`show me all from pickupline;`)
 	l := NewLexer(line)
 	p := NewParser(l)
 	stmt := p.Run()
@@ -86,7 +86,10 @@ func TestSelectStatement(t *testing.T) {
 }
 
 func TestDeleteStatement(t *testing.T) {
-	line := fmt.Sprintf(`ditch this crap from pickupline where id = 0;`)
+	// t.Skip()
+	// TestCreateStatement(t)
+	// TestInsertStatement(t)
+	line := fmt.Sprintf(`ditch this crap from pickupline where success_rate=0;`)
 	l := NewLexer(line)
 	p := NewParser(l)
 	stmt := p.Run()
@@ -104,4 +107,6 @@ func TestDeleteStatement(t *testing.T) {
 	}
 	q = Query{statements: stmt}
 	RunQuery(q)
+	TestSelectStatement(t)
+
 }

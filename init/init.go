@@ -20,7 +20,7 @@ func Init() *os.File {
 
 		fmt.Println(dbname, os.Getpagesize())
 		// wd, _ := os.Getwd()
-		fileStat, err := os.Stat(dbname)
+		_, err := os.Stat(dbname)
 		if !os.IsNotExist(err) {
 			Dbfile, err = os.OpenFile(dbname, os.O_RDWR, 0777)
 
@@ -31,7 +31,7 @@ func Init() *os.File {
 			LoadDatabase(Dbfile)
 			return
 		}
-		fmt.Println(fileStat)
+		// fmt.Println(fileStat)
 		// os.Create()
 		// Dbfile, err := os.OpenFile(dbname, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
 		Dbfile, _ = os.Create(dbname)

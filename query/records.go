@@ -166,6 +166,7 @@ func (ds *DeleteStatement) DeleteRecord() error {
 				return err
 			}
 			if err := btree.Remove(uint32(val)); err != nil {
+				log.Fatal(err)
 				return err
 			}
 		}
@@ -384,6 +385,11 @@ func (ex *ExprOperation) EvalExpOp() []ColumnValues {
 		switch e := ex.Left.(type) {
 		case *ExprIdentifier:
 			ident = e.Name
+			if _, ok := schema.Columns[ident]; !ok {
+				log.Println("column not found in this table got=", ident)
+				return []ColumnValues{}
+
+			}
 		}
 
 		switch e := ex.Right.(type) {
@@ -410,7 +416,7 @@ func (ex *ExprOperation) EvalExpOp() []ColumnValues {
 			}
 		}
 
-		return allRecs
+		return colWithAllVals
 		// TODO: Same can be done to greater than eq and less than eq
 
 	case OpAnd:
