@@ -3,6 +3,7 @@ package Init
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 )
@@ -19,11 +20,31 @@ func Init() *os.File {
 
 		fmt.Println(dbname, os.Getpagesize())
 		// wd, _ := os.Getwd()
+		fileStat, err := os.Stat(dbname)
+		if !os.IsNotExist(err) {
+			Dbfile, err = os.OpenFile(dbname, os.O_RDWR, 0777)
+
+			// Dbfile, err = os.Open(dbname)
+			if err != nil {
+				log.Fatal(Dbfile)
+			}
+			LoadDatabase(Dbfile)
+			return
+		}
+		fmt.Println(fileStat)
+		// os.Create()
+		// Dbfile, err := os.OpenFile(dbname, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
 		Dbfile, _ = os.Create(dbname)
+		// err = Dbfile.Chmod(0777)
+		// if err != nil {
+		// 	Dbfile.Close()
+		// 	log.Fatal(err)
+		// }
+
 		// defer dbfile.Close()
 		fmt.Println(Dbfile.Fd())
 		if err := makeFileHeader(Dbfile); err != nil {
-			return
+			// return
 		}
 		fmt.Println("Check the header")
 
@@ -67,6 +88,22 @@ var (
 // 			72		20	Reserved for expansion. Must be zero.
 // 			92		4	The version-valid-for number.
 // 			96		4	SQLITE_VERSION_NUMBER
+
+func LoadDatabase(file *os.File) {
+	pagesize := make([]byte, PAGE_SIZE)
+	_, err := file.Read(pagesize)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	SCHEMA_TABLE = int(binary.BigEndian.Uint32(pagesize[18:]))
+	RECORD_PAGE = int(binary.BigEndian.Uint32(pagesize[22:]))
+	TOTAL_PAGES = int(binary.BigEndian.Uint32(pagesize[30:]))
+	ROOTPAGE = int(binary.BigEndian.Uint32(pagesize[34:]))
+	FREELIST_START = int(binary.BigEndian.Uint32(pagesize[38:]))
+	FREELIST_COUNT = int(binary.BigEndian.Uint32(pagesize[42:]))
+
+}
 
 // make the file header
 func makeFileHeader(file *os.File) error {
@@ -140,6 +177,27 @@ func UpdateSchemaTable(pageNo uint) error {
 	SCHEMA_TABLE = int(pageNo)
 	return nil
 
+}
+func UpdateRecordPage(pageNo uint) error {
+	buff := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(buff, uint32(pageNo))
+	_, err := Dbfile.WriteAt(buff, 22) // 0 means relative to the origin of the file
+	if err != nil {
+		return fmt.Errorf("error changing the schema table: %w", err)
+	}
+	RECORD_PAGE = int(pageNo)
+	return nil
+
+}
+
+func ReadSchemaTable() {
+	if SCHEMA_TABLE != 0 {
+		pageoffset := PAGE_SIZE * SCHEMA_TABLE
+		pagesize := make([]byte, PAGE_SIZE)
+		Dbfile.ReadAt(pagesize, int64(pageoffset))
+
+	}
 }
 
 // make the serialize function for page of 4096 bytes and way to fit all the cell

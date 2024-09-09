@@ -4,7 +4,7 @@ import (
 	Init "blackdb/init"
 	"blackdb/pager"
 	"blackdb/query"
-	"fmt"
+	"log"
 	"os"
 )
 
@@ -13,15 +13,30 @@ var file *os.File
 func init() {
 	file = Init.Init()
 	// 	// pagH, _ :=
-	pager.MakePageZero(22, 1)
-	err := pager.LoadPage(0)
-	if err != nil {
-		fmt.Println("error while loading the page")
+	if Init.SCHEMA_TABLE != 0 {
+		pager.LoadPage(1)
+		schemaPage, err := pager.GetPage(uint(Init.SCHEMA_TABLE))
+		if err != nil {
+			log.Fatal(err)
+		}
+		schemaCell, err := schemaPage.GetCell(0)
+		query.ExecQuery(string(schemaCell.CellContent))
+	} else {
+		_, err := pager.MakePageZero(22, 1)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = pager.LoadPage(0)
+		if err != nil {
+			log.Fatal("error while loading the page")
+		}
+
 	}
 
 }
 
 func main() {
+	defer Init.Dbfile.Close()
 	in := os.Stdin
 	w := os.Stdout
 

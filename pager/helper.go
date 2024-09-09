@@ -126,7 +126,7 @@ func LoadPage(pageNo uint) error {
 
 	fileStat, err := Init.Dbfile.Stat()
 	if err != nil {
-		return fmt.Errorf("error while reading file Info ... %w", err)
+		return fmt.Errorf("error while reading file Info ... %w  %s", err, fileStat)
 	}
 	offset := BufData.PageNum * uint(Init.PAGE_SIZE)
 	mapSize := func() uint {

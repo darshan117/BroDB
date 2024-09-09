@@ -231,8 +231,20 @@ func (p *parser) parseCreateStatement() Statement {
 			return nil
 		}
 	}
-	if !p.expectPeek(SEMICOLON) {
-		return nil
+	switch p.peekToken.Type {
+	case SEMICOLON:
+		p.getNextToken()
+		return table
+	case IDENT:
+		p.getNextToken()
+		primaryKey := p.curToken.Literal
+		if !p.expectPeek(TOKEN_PRIMARY) {
+			return nil
+		}
+		schema.PrimaryKey = primaryKey
+	default:
+		p.expectPeek(SEMICOLON)
+
 	}
 	return table
 

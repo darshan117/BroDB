@@ -36,7 +36,7 @@ type ColConf struct {
 	colWidth int
 }
 
-func FilterRowsAndRenderTable(allRecs []ColumnValues, rows []int, table Table) {
+func FilterRowsAndRenderTable(allRecs []ColumnValues, table Table) {
 
 	// for key, col := range allRecs {
 	// 	for _, row := range rows {
@@ -47,8 +47,11 @@ func FilterRowsAndRenderTable(allRecs []ColumnValues, rows []int, table Table) {
 	// 	}
 	t := MakeColConfig(table)
 	fmt.Print(t.RenderColHeader(table.TableName))
-	fmt.Print(t.RenderRows(allRecs, rows))
+	fmt.Print(t.RenderRows(allRecs))
 	fmt.Print(t.RenderFooter())
+	if len(allRecs) == 0 {
+		fmt.Println(" No records found. ")
+	}
 
 	// }
 
@@ -93,18 +96,47 @@ func MakeColConfig(table Table) TableConf {
 func (t *TableConf) RenderColHeader(tablename string) string {
 	var sb strings.Builder
 
-	sb.WriteString(topLeft + " " + fmt.Sprintf("\x1b[1;34m%s", tablename) + " ")
-	sb.WriteString("\x1b[0m")
+	sb.WriteString(topLeft)
+	// tname := fmt.Sprintf(" \x1b[1;34jm%s \x1b[0m", tablename)
+	tname := fmt.Sprintf(" %s ", tablename)
+	// fmt.Print("\x1b[1;34m")
+	totalWidth := 0
+	for _, col := range t.colconf {
+		totalWidth += col.colWidth + 2 // +2 for padding
+	}
+	totalWidth -= 1
+	if len(tname) > totalWidth-2 {
+		tname = tname[:totalWidth-5] + "..."
+	}
 	for i, col := range t.colconf {
-		if i == 0 {
-			sb.WriteString(strings.Repeat(horizontal, col.colWidth-(len(tablename))))
+		if len(tname) >= 0 {
+			var temp string
+			if len(tname) >= col.colWidth {
+				temp = tname[:col.colWidth+2]
+				tname = tname[col.colWidth+2:]
+
+			} else {
+				temp = tname
+				tname = ""
+			}
+			r := (col.colWidth + 2) - len(temp)
+
+			sb.WriteString(fmt.Sprintf("\x1b[1;34m%s\x1b[0m", temp) + strings.Repeat(horizontal, r))
 
 		} else {
 
 			sb.WriteString(strings.Repeat(horizontal, col.colWidth+2))
 		}
-		if i < t.cols-1 {
+		if i < t.cols-1 && len(tname) == 0 {
+			// fmt.Print("\x1b[0m")
 			sb.WriteString(tJunction)
+		} else if i < t.cols-1 {
+			if len(tname) >= 1 {
+				sb.WriteString(fmt.Sprintf("\x1b[1;34m%s\x1b[0m", string(tname[0:1])))
+				tname = tname[1:]
+			}
+
+			// tname = ""
 		}
 	}
 	sb.WriteString(topRight + "\n")
@@ -130,12 +162,12 @@ func (t *TableConf) RenderColHeader(tablename string) string {
 
 	return sb.String()
 }
-func (t *TableConf) RenderRows(allRecs []ColumnValues, rows []int) string {
+func (t *TableConf) RenderRows(allRecs []ColumnValues) string {
 	var sb strings.Builder
-	for _, v := range rows {
+	for _, v := range allRecs {
 		sb.WriteString(vertical)
 		for i, col := range t.colconf {
-			val := allRecs[v][col.colName].val
+			val := v[col.colName].val
 			if len(val) > col.colWidth {
 				val = val[:col.colWidth-3]
 				val += "..."

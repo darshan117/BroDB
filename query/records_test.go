@@ -5,6 +5,7 @@ import (
 	Init "blackdb/init"
 	"blackdb/pager"
 	"fmt"
+	"log"
 	"reflect"
 	"testing"
 )
@@ -16,15 +17,20 @@ func Initialize() {
 	if err != nil {
 		fmt.Println("error while loading the page")
 	}
+	if Init.SCHEMA_TABLE != 0 {
+		schemaPage, err := pager.GetPage(uint(Init.SCHEMA_TABLE))
+		if err != nil {
+			log.Fatal(err)
+		}
+		schemaCell, err := schemaPage.GetCell(0)
+		log.Fatal(string(schemaCell.CellContent))
+	}
 }
 
 func TestCreateStatement(t *testing.T) {
 	Initialize()
-	line := `let's build this playbook hello ( id  int, new text);`
+	line := `let's build this playbook pickupline( id  int, new text) id Primary_Key;`
 	l := NewLexer(line)
-	// fmt.Println(l.NextToken())
-	// l.lexer()
-
 	p := NewParser(l)
 	stmt := p.Run()
 	if len(p.err) != 0 {
@@ -32,6 +38,7 @@ func TestCreateStatement(t *testing.T) {
 	}
 	q := Query{statements: stmt}
 	RunQuery(q)
+	fmt.Println("primary key is ", schema.PrimaryKey)
 
 }
 
@@ -39,12 +46,8 @@ func TestInsertStatement(t *testing.T) {
 	// TestCreateStatement(t)
 	nkeys := 3
 	for i := 0; i <= nkeys; i++ {
-		line := fmt.Sprintf(`slam this into hello (id,new) this crazy shit (%d,"hello %d");`, i, i)
-		// fmt.Println(line)
+		line := fmt.Sprintf(`slam this into pickupline (id,new) this crazy shit (%d,"hello there who  %d");`, i, i)
 		l := NewLexer(line)
-		// fmt.Println(l.NextToken())
-		// l.lexer()
-
 		p := NewParser(l)
 		stmt := p.Run()
 		if len(p.err) != 0 {
@@ -54,21 +57,8 @@ func TestInsertStatement(t *testing.T) {
 		RunQuery(q)
 
 	}
-	// line := fmt.Sprintf(`slam this into hello (id,new) this crazy shit (%d,"hello %d");`, 1060, 1060)
-	// fmt.Println(line)
-	// l := NewLexer(line)
-	// fmt.Println(l.NextToken())
-	// l.lexer()
-
-	// p := NewParser(l)
-	// stmt := p.Run()
-	// if len(p.err) != 0 {
-	// 	t.Error(p.err)
-	// }
-	// q := Query{statements: stmt}
-	// RunQuery(q)
 	testkeys := make([]uint32, 0, nkeys)
-	for i := 1; i <= nkeys+1; i++ {
+	for i := 0; i <= nkeys; i++ {
 		testkeys = append(testkeys, uint32(i))
 	}
 	allkeys, _ := btree.BtreeDFSTraversal()
@@ -83,20 +73,35 @@ func TestInsertStatement(t *testing.T) {
 }
 
 func TestSelectStatement(t *testing.T) {
-	// TestCreateStatement(t)
-	// TestInsertStatement(t)
 
-	line := fmt.Sprintf(`show me all from hello;`)
-	// fmt.Println(line)
+	line := fmt.Sprintf(`show me all from pickupline where id = 0;`)
 	l := NewLexer(line)
-	// fmt.Println(l.NextToken())
-	// l.lexer()
-
 	p := NewParser(l)
 	stmt := p.Run()
 	if len(p.err) != 0 {
 		t.Error(p.err)
 	}
 	q := Query{statements: stmt}
+	RunQuery(q)
+}
+
+func TestDeleteStatement(t *testing.T) {
+	line := fmt.Sprintf(`ditch this crap from pickupline where id = 0;`)
+	l := NewLexer(line)
+	p := NewParser(l)
+	stmt := p.Run()
+	if len(p.err) != 0 {
+		t.Error(p.err)
+	}
+	q := Query{statements: stmt}
+	RunQuery(q)
+	line = fmt.Sprintf(`show me all from pickupline;`)
+	l = NewLexer(line)
+	p = NewParser(l)
+	stmt = p.Run()
+	if len(p.err) != 0 {
+		t.Error(p.err)
+	}
+	q = Query{statements: stmt}
 	RunQuery(q)
 }

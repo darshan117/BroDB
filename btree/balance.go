@@ -123,7 +123,6 @@ func (nodePage *BtreePage) Shuffle() (leftsibling *BtreePage, rightsibling *Btre
 func (node *BtreePage) chooseFrom() (leftsibling *BtreePage, rightsibling *BtreePage, err error) {
 	leftcount := 0
 	firstcell, err := node.GetCell(0)
-	// fmt.Println("first cell is ",binary.BigEndian.Uint32(firstcell.CellContent[:4]))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting the first cell  %w", err)
 	}
@@ -216,14 +215,11 @@ func (node *BtreePage) NodeParent(key uint32) (*uint16, *uint16, error) {
 		//
 	}
 	fmt.Println(node.GetKeys(), key, node.PageHeader)
-	panic("nodeparent error")
 	return nil, nil, fmt.Errorf("no parent found %d", key)
 
 }
 
 func (node *BtreePage) keyIsPresent(key uint32) bool {
-	// fmt.Println(node.PageId)
-	// pager.LoadPage(uint(node.PageId))
 	for _, val := range node.GetSlots() {
 		// FIXME: can do the binary search here
 		cell := node.GetCellByOffset(val)
