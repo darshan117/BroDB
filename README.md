@@ -9,6 +9,7 @@ Welcome to BroDB, the database that's got your back like a true bro! Written fro
 - **B-tree Indexing**: Our B-trees are so jacked, they make binary trees look like twigs.
 - **Table Rendering**: Tables so pretty, you'll want to frame them and hang them in your man cave.
 - **Bro Query Language (BQL)**: SQL's cooler, more laid-back cousin. It's like talking to your bros, but for data!
+- **Bro-Friendly**: If your database doesn't talk like your bros, is it even a real database?
 
 ## Getting Started: Time to Crush It! 
 
@@ -32,7 +33,7 @@ BRO, LET'S BUILD THIS PLAYBOOK pickup_lines (id INT,the_line TEXT,success_rate I
 ### Insert Data
 
 ```
- BRO, SLAM THIS INTO pickup_line (id,the_line) THIS CRAZY SHIT (7,"Sup, hottie?");
+ BRO, SLAM THIS INTO pickup_line (id,the_line,success_rate) THIS CRAZY SHIT (7,"Sup, hottie?",89);
 ```
 
 ### Select Data 
@@ -49,8 +50,20 @@ BRO, SHOW ME (id , the_line) FROM pickup_lines WHERE id = 7 and the_line="Sup, h
 ```
 BRO, DITCH THIS CRAP FROM pickup_lines where id =7;
 ```
+### EXIT
+```
+exit
+```
 
-- **Bro-Friendly**: If your database doesn't talk like your bros, is it even a real database?
+### Sample Output
+```
+┌ pickup_line ────────────────────┬────────────────┐
+│ id       │ the_line             │ success_rate   │
+├──────────┼──────────────────────┼────────────────┤
+│ 7        │ Sup, hottie?         │ 89             │
+└──────────┴──────────────────────┴────────────────┘
+```
+
 
 ## Contributing: Become a Bro-veloper 
 
