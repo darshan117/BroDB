@@ -21,26 +21,33 @@ Welcome to BroDB, the database that's got your back like a true bro! Written fro
 ### Create a Table 
 
 ```
-BRO, LET'S BUILD THIS PLAYBOOK pickup_lines (
-    id INT,
-    the_line TEXT,
-    success_rate INT
-);
+BRO, LET'S BUILD THIS PLAYBOOK pickup_lines (id INT,the_line TEXT,success_rate INT);
+
+# Set the primary_key using
+
+BRO, LET'S BUILD THIS PLAYBOOK pickup_lines (id INT,the_line TEXT,success_rate INT) id PRIMARY_KEY;
+
+```
+
+### Insert Data
+
+```
+ BRO, SLAM THIS INTO pickup_line (id,the_line) THIS CRAZY SHIT (7,"Sup, hottie?");
 ```
 
 ### Select Data 
 
 ```
-bro, show me all from pickup_lines;
+BRO, SHOW ME ALL FROM pickup_lines;
 
 # Or get specific, bro
-bro, show me all from pickup_lines where id = 7 and the_line="Are you a parking ticket? 'Cause you've got FINE written all over you.";
+BRO, SHOW ME (id , the_line) FROM pickup_lines WHERE id = 7 and the_line="Sup, hottie?";
 ```
 
 ### Delete Data 
 
 ```
-bro, DITCH this crap from pickup_lines where the_line="Did it hurt when you fell from heaven?";
+BRO, DITCH THIS CRAP FROM pickup_lines where id =7;
 ```
 
 - **Bro-Friendly**: If your database doesn't talk like your bros, is it even a real database?
