@@ -55,14 +55,6 @@ BRO, DITCH THIS CRAP FROM pickup_lines where id =7;
 exit
 ```
 
-### Sample Output
-```
-┌ pickup_line ────────────────────┬────────────────┐
-│ id       │ the_line             │ success_rate   │
-├──────────┼──────────────────────┼────────────────┤
-│ 7        │ Sup, hottie?         │ 89             │
-└──────────┴──────────────────────┴────────────────┘
-```
 
 
 ## Contributing: Become a Bro-veloper 
