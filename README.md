@@ -2,7 +2,7 @@
 
 ## What's the Deal, Bro? 
 
-Welcome to BroDB, the database that's got your back like a true bro! Written from scratch in Go (because real bros don't need no third-party libraries).
+Welcome to BroDB, the database that's got your back like a true bro! Written from scratch in Go (because real bros don't need no third-party libraries). Inspired by barney from TV series HIMYM.
 
 ## Features 😎
 
