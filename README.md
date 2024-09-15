@@ -18,6 +18,12 @@ Welcome to BroDB, the database that's got your back like a true bro! Written fro
 3. Run it (./brodb dbfile_name)
 
 ## Bro Query Language: Speak Bro, Query Bro 
+### Demo
+
+
+https://github.com/user-attachments/assets/5751176b-c332-4c39-96a3-a3029cb6a03a
+
+
 
 ### Create a Table 
 
