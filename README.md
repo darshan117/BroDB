@@ -1,8 +1,12 @@
-# BroDB:
+# BroSql:
 
 ## What's the Deal, Bro? 
 
-Welcome to BroDB, the database that's got your back like a true bro! Written from scratch in Go no third party libraries used. Inspired by barney from TV series HIMYM.
+Welcome to BroSql, the database that's got your back like a true bro! Written from scratch in Go no third party libraries used. Inspired by barney from TV series HIMYM.
+
+## Working 
+BroSQL uses BTree for storing items in the database, providing a full implementation of the BTree structure.
+![btree](https://github.com/user-attachments/assets/82fade4a-d673-47ce-ab30-002dc7f42299)
 
 ## Features 
 
