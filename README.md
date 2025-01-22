@@ -2,9 +2,10 @@
 
 ## What's the Deal, Bro? 
 
-Welcome to BroDB, the database that's got your back like a true bro! Written from scratch in Go (because real bros don't need no third-party libraries). Inspired by barney from TV series HIMYM.
+Welcome to BroDB, the database that's got your back like a true bro! Written from scratch in Go no third party libraries used. Inspired by barney from TV series HIMYM.
 
-## Features 😎
+## Features 
+
 
 - **B-tree Indexing**: Our B-trees are so jacked, they make binary trees look like twigs.
 - **Table Rendering**: Tables so pretty, you'll want to frame them and hang them in your man cave.
@@ -20,10 +21,7 @@ Welcome to BroDB, the database that's got your back like a true bro! Written fro
 ## Bro Query Language: Speak Bro, Query Bro 
 ### Demo
 
-
-https://github.com/user-attachments/assets/5751176b-c332-4c39-96a3-a3029cb6a03a
-
-
+![Screenshot from 2025-01-22 18-44-37](https://github.com/user-attachments/assets/6a9f2d1f-7414-4f79-84ab-7993ae568b97)
 
 ### Create a Table 
 
@@ -39,7 +37,7 @@ BRO, LET'S BUILD THIS PLAYBOOK pickup_lines (id INT,the_line TEXT,success_rate I
 ### Insert Data
 
 ```
- BRO, SLAM THIS INTO pickup_line (id,the_line,success_rate) THIS CRAZY SHIT (7,"Sup, hottie?",89);
+ BRO, SLAM THIS INTO pickup_line (id,the_line,success_rate) THIS CRAZY SHIT (7,"Check this out!",89);
 ```
 
 ### Select Data 
@@ -48,7 +46,7 @@ BRO, LET'S BUILD THIS PLAYBOOK pickup_lines (id INT,the_line TEXT,success_rate I
 BRO, SHOW ME ALL FROM pickup_lines;
 
 # Or get specific, bro
-BRO, SHOW ME (id , the_line) FROM pickup_lines WHERE id = 7 and the_line="Sup, hottie?";
+BRO, SHOW ME (id , the_line) FROM pickup_lines WHERE id = 7 and the_line="Check this out!";
 ```
 
 ### Delete Data 
