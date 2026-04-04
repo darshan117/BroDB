@@ -72,6 +72,7 @@ exit
 3. Commit your changes (`git commit -m 'Add some AmazingBroFeature'`)
 4. Push to the branch (`git push origin feature/AmazingBroFeature`)
 5. Open a Pull Request (and flex on them code reviewers)
+Check it out!!
 
 ---
 
